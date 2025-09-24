@@ -9,6 +9,7 @@ import Results from "./results"
 export default function LightGBMResults() {
   const breadcrumbItems = [
     { label: "Home", href: "/" },
+    { label: "Models", href: "/models" },
     { label: "LightGBM", current: true },
   ]
 

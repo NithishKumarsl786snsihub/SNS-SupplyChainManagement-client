@@ -9,6 +9,7 @@ import Results from "./results"
 export default function XGBoostResultsPage() {
   const breadcrumbItems = [
     { label: "Home", href: "/" },
+    { label: "Models", href: "/models" },
     { label: "XGBoost", current: true },
   ]
 

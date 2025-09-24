@@ -9,6 +9,7 @@ import Results from "./results"
 export default function RandomForestResultsPage() {
   const breadcrumbItems = [
     { label: "Home", href: "/" },
+    { label: "Models", href: "/models" },
     { label: "Random Forest", current: true },
   ]
 

@@ -43,6 +43,7 @@ interface ResultsProps {
 export default function Results({ onRunAnotherModel }: ResultsProps) {
   const breadcrumbItems = [
     { label: "Home", href: "/" },
+    { label: "Models", href: "/models" },
     { label: "VARIMA", current: true },
   ]
 

@@ -9,6 +9,7 @@ import Results from "./results"
 export default function ProphetResultsPage() {
   const breadcrumbItems = [
     { label: "Home", href: "/" },
+    { label: "Models", href: "/models" },
     { label: "Prophet", current: true },
   ]
 

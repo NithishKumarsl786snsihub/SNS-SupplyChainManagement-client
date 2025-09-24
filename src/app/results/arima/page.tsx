@@ -9,6 +9,7 @@ import Results from "./results"
 export default function ARIMAResultsPage() {
   const breadcrumbItems = [
     { label: "Home", href: "/" },
+    { label: "Models", href: "/models" },
     { label: "ARIMA", current: true },
   ]
 

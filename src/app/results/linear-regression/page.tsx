@@ -9,6 +9,7 @@ import Results from "./results"
 export default function LinearRegressionResultsPage() {
   const breadcrumbItems = [
     { label: "Home", href: "/" },
+    { label: "Models", href: "/models" },
     { label: "Linear Regression", current: true },
   ]
 

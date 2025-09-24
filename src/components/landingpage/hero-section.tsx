@@ -140,11 +140,11 @@ export function HeroSection() {
             </a>
 
             <a
-              href="#features"
+              href="/demo-videos"
               className="group inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-orange-700 bg-white/60 backdrop-blur-sm border border-orange-200 rounded-lg hover:bg-white/80 hover:border-orange-300 transform hover:scale-105 transition-all duration-300 ease-out shadow-lg"
             >
               <Play className="mr-2 h-5 w-5" />
-              Learn More
+                Watch demo video
             </a>
           </div>
         </div>
