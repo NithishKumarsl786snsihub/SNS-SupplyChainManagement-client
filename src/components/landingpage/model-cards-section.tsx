@@ -64,6 +64,11 @@ export function ModelCardsSection() {
       description: "Facebook's robust forecasting tool with automatic seasonality detection",
       category: "time-series" as const,
     },
+    {
+      name: "VARIMA",
+      description: "Vector ARIMA for multivariate time series with cross-variable dependencies",
+      category: "time-series" as const,
+    },
   ]
 
   return (
@@ -97,7 +102,8 @@ export function ModelCardsSection() {
                   model.name === "ARIMA" ? "arima" :
                   model.name === "SARIMA" ? "sarima" :
                   model.name === "ARIMAX" ? "arimax" :
-                  model.name === "Prophet" ? "prophet" : "xgboost"
+                  model.name === "Prophet" ? "prophet" :
+                  model.name === "VARIMA" ? "varima" : "xgboost"
                 router.push(`/results/${slug}`)
               }}
             />
