@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { UploadResponse, ModelInfo, PredictionResponse, PriceOptimizationResponse, ApiError, DatasetInfo } from '../../types/api'
+import { UploadResponse, ModelInfo, PredictionResponse, PriceOptimizationResponse, ApiError, DatasetInfo } from '../../../types/api'
 import axios from 'axios'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts'
 
