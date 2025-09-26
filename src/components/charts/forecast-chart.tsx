@@ -30,6 +30,22 @@ export function ForecastChart({ data, title = "Forecast vs Actual" }: ForecastCh
     )
   }
 
+  // Compute dynamic Y-axis domain with slight padding and compact tick formatting
+  const values: number[] = []
+  for (const row of data) {
+    if (typeof row.predicted === 'number') values.push(row.predicted)
+    if (typeof row.actual === 'number') values.push(row.actual)
+    if (typeof row.confidence_upper === 'number') values.push(row.confidence_upper)
+    if (typeof row.confidence_lower === 'number') values.push(row.confidence_lower)
+  }
+  const minVal = Math.min(...values)
+  const maxVal = Math.max(...values)
+  const range = Math.max(1, maxVal - minVal)
+  // Add stronger padding so the line never hugs the axes
+  const pad = Math.max(10, Math.round(range * 0.30))
+  const domain: [number, number] = [minVal - pad, maxVal + pad]
+  const compactFmt = new Intl.NumberFormat(undefined, { notation: 'compact' })
+
   return (
     <Card>
       <CardHeader>
@@ -46,7 +62,7 @@ export function ForecastChart({ data, title = "Forecast vs Actual" }: ForecastCh
                 fontSize={12}
                 tickFormatter={(value) => new Date(value).toLocaleDateString()}
               />
-              <YAxis stroke="#666" fontSize={12} />
+              <YAxis stroke="#666" fontSize={12} domain={domain} tickFormatter={(v) => compactFmt.format(Number(v))} />
               <Tooltip
                 contentStyle={{
                   backgroundColor: "white",
@@ -54,6 +70,7 @@ export function ForecastChart({ data, title = "Forecast vs Actual" }: ForecastCh
                   borderRadius: "8px",
                 }}
                 labelFormatter={(value) => new Date(value).toLocaleDateString()}
+                formatter={(value: number, name: string) => [compactFmt.format(value), name]}
               />
               <Legend />
               {data.some((d) => d.actual !== undefined) && (
@@ -62,16 +79,18 @@ export function ForecastChart({ data, title = "Forecast vs Actual" }: ForecastCh
                   dataKey="actual"
                   stroke="#6b7280"
                   strokeWidth={2}
-                  dot={{ fill: "#6b7280", strokeWidth: 2, r: 4 }}
+                  dot={{ fill: "#6b7280", strokeWidth: 2, r: 3 }}
+                  connectNulls
                   name="Actual"
                 />
               )}
               <Line
                 type="monotone"
                 dataKey="predicted"
-                stroke="var(--color-sns-orange)"
+                stroke="#D96F32"
                 strokeWidth={2}
-                dot={{ fill: "var(--color-sns-orange)", strokeWidth: 2, r: 4 }}
+                dot={{ fill: "#D96F32", strokeWidth: 2, r: 3 }}
+                connectNulls
                 name="Predicted"
               />
               {data.some((d) => d.confidence_upper !== undefined) && (
@@ -79,19 +98,21 @@ export function ForecastChart({ data, title = "Forecast vs Actual" }: ForecastCh
                   <Line
                     type="monotone"
                     dataKey="confidence_upper"
-                    stroke="var(--color-sns-yellow)"
+                    stroke="#E9A23B"
                     strokeWidth={1}
                     strokeDasharray="5 5"
                     dot={false}
+                    connectNulls
                     name="Upper Confidence"
                   />
                   <Line
                     type="monotone"
                     dataKey="confidence_lower"
-                    stroke="var(--color-sns-yellow)"
+                    stroke="#E9A23B"
                     strokeWidth={1}
                     strokeDasharray="5 5"
                     dot={false}
+                    connectNulls
                     name="Lower Confidence"
                   />
                 </>
