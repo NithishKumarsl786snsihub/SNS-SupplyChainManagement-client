@@ -115,9 +115,9 @@ export default function Results({ datasetInfo, onRunAnotherModel }: ResultsProps
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-1 gap-6 ">
           {/* Left Column: Dataset Info */}
-          <div className="xl:col-span-1 space-y-6">
+          <div className="xl:col-span-2 space-y-6">
             {datasetInfo && (
               <Card className="rounded-2xl border-0 bg-white/70 backdrop-blur ring-1 ring-[#F3E9DC] shadow-[0_10px_30px_rgba(217,111,50,0.06)]">
                 <CardHeader>
@@ -137,14 +137,15 @@ export default function Results({ datasetInfo, onRunAnotherModel }: ResultsProps
 
           {/* Right Column: Forecast */}
           <div className="xl:col-span-2 space-y-6">
-            <Card className="bg-white rounded-2xl border-0 ring-1 ring-[#F3E9DC] shadow-[0_10px_30px_rgba(217,111,50,0.06)]">
+               <Card className="bg-white rounded-2xl border-0 ring-1 ring-[#F3E9DC] shadow-[0_10px_30px_rgba(217,111,50,0.06)]">
               <CardHeader>
-                <CardTitle className="text-xl">ARIMA Model</CardTitle>
+                <CardTitle className="text-md">Model Information</CardTitle>
               </CardHeader>
-              <CardContent>
-                {modelInfo && (
+              <CardContent>   
+
+      {modelInfo && (
                   <div className="mb-4 p-4 bg-gray-50 rounded-lg border">
-                    <h3 className="font-semibold text-gray-900 mb-2">Model Information</h3>
+                   
                     <div className="grid grid-cols-2 gap-2 text-sm">
                       <div><span className="text-gray-600">Order (p,d,q):</span> ({modelInfo.order.join(', ')})</div>
                       <div><span className="text-gray-600">AIC Score:</span> {modelInfo.aic?.toFixed(2) || 'N/A'}</div>
@@ -154,6 +155,19 @@ export default function Results({ datasetInfo, onRunAnotherModel }: ResultsProps
                     </div>
                   </div>
                 )}
+ 
+              </CardContent>
+            </Card>
+            <Card className="bg-white rounded-2xl border-0 ring-1 ring-[#F3E9DC] shadow-[0_10px_30px_rgba(217,111,50,0.06)]">
+              <CardHeader>
+                <CardTitle className="text-xl flex items-center">  
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                        ARIMA Forecast Results</CardTitle>
+              </CardHeader>
+              <CardContent>
+           
 
                 {error && (
                   <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
@@ -169,12 +183,7 @@ export default function Results({ datasetInfo, onRunAnotherModel }: ResultsProps
                 {predictions && (
                   <div className="mt-6">
                     <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold flex items-center">
-                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                        </svg>
-                        ARIMA Forecast Results
-                      </h3>
+                   
                       <span className="bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full">
                         {predictions.dates.length} periods forecast
                       </span>

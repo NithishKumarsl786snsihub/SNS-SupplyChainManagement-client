@@ -13,6 +13,8 @@ const items = [
   { name: "TFT", slug: "tft" },
   { name: "ARIMA", slug: "arima" },
   { name: "SARIMA", slug: "sarima" },
+  { name: "SARIMAX", slug: "sarimax" },
+
   { name: "ARIMAX", slug: "arimax" },
   { name: "Prophet", slug: "prophet" },
   { name: "VARIMA", slug: "varima" },
