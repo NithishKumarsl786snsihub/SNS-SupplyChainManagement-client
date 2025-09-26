@@ -5,6 +5,7 @@ import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 import { ResultsSidebar } from "@/components/sidebar"
 import Upload from "./upload"
 import Results from "./results"
+import { TrainingResponse, PredictionResponse } from "@/config/api"
 
 export default function LinearRegressionResultsPage() {
   const breadcrumbItems = [
@@ -14,13 +15,26 @@ export default function LinearRegressionResultsPage() {
   ]
 
   const [processingDone, setProcessingDone] = useState(false)
+  const [processingState, setProcessingState] = useState<{
+    trainingResult: TrainingResponse | null
+    predictionResult: PredictionResponse | null
+    datasetId?: number | null
+    datasetIdM6?: number | null
+  }>({
+    trainingResult: null,
+    predictionResult: null,
+    datasetId: null,
+    datasetIdM6: null
+  })
 
-  const handleProcessingComplete = () => {
+  const handleProcessingComplete = (trainingResult: TrainingResponse, predictionResult: PredictionResponse, datasetId?: number, datasetIdM6?: number) => {
+    setProcessingState({ trainingResult, predictionResult, datasetId: datasetId ?? null, datasetIdM6: datasetIdM6 ?? null })
     setProcessingDone(true)
   }
 
   const handleRunAnotherModel = () => {
     setProcessingDone(false)
+    setProcessingState({ trainingResult: null, predictionResult: null, datasetId: null, datasetIdM6: null })
   }
 
   return (
@@ -34,7 +48,13 @@ export default function LinearRegressionResultsPage() {
           </div>
         </>
       ) : (
-        <Results onRunAnotherModel={handleRunAnotherModel} />
+        <Results 
+          onRunAnotherModel={handleRunAnotherModel}
+          trainingResult={processingState.trainingResult}
+          predictionResult={processingState.predictionResult}
+          datasetId={processingState.datasetId ?? undefined}
+          datasetIdM6={processingState.datasetIdM6 ?? undefined}
+        />
       )}
     </div>
   )
