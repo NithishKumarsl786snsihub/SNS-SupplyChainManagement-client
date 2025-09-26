@@ -28,7 +28,7 @@ interface FilePreviewState {
 }
 
 interface UploadProps {
-  onProcessingComplete: () => void
+  onProcessingComplete: (result: { preview: Array<Record<string, unknown>>; steps: number; chart_base64: string }) => void
 }
 
 export default function Upload({ onProcessingComplete }: UploadProps) {
@@ -46,9 +46,9 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
 
   // Sample dataset used in the Dataset Preview card
   const getSampleData = () => [
-    { Date: "2024-01-01", Demand: 1200, Price: 28, "Inventory Level": 4800, "Seasonal Factor": 1.2, Promotional: 0 },
-    { Date: "2024-01-02", Demand: 1150, Price: 28, "Inventory Level": 4650, "Seasonal Factor": 1.2, Promotional: 0 },
-    { Date: "2024-01-03", Demand: 1300, Price: 27, "Inventory Level": 4500, "Seasonal Factor": 1.2, Promotional: 1 },
+    { date: "2024-01-01", sales: 1200 },
+    { date: "2024-01-02", sales: 1150 },
+    { date: "2024-01-03", sales: 1300 },
   ]
 
   const handleDownload = () => {
@@ -68,52 +68,81 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
     setTimeout(() => setIsDownloaded(false), 2000)
   }
 
-  const callDummyUploadEndpoint = async (file: File) => {
+  const uploadToBackend = async (file: File, steps = 30) => {
     const formData = new FormData()
     formData.append("file", file)
-    formData.append("model", "sarima")
-    try { 
-      await fetch("/api/dummy-upload/sarima", { method: "POST", body: formData }) 
-    } catch {}
+    formData.append("steps", String(steps))
+
+    const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000"
+    const resp = await fetch(`${base}/api/sarima/forecast/`, {
+      method: "POST",
+      body: formData,
+    })
+
+    if (!resp.ok) {
+      let maybeError: unknown
+      try {
+        maybeError = await resp.json()
+      } catch {
+        maybeError = null
+      }
+      let errMessage: string | undefined
+      if (maybeError && typeof maybeError === "object" && "error" in maybeError) {
+        const errorVal = (maybeError as { error?: unknown }).error
+        if (typeof errorVal === "string") {
+          errMessage = errorVal
+        }
+      }
+      throw new Error(errMessage ?? `Upload failed with status ${resp.status}`)
+    }
+
+    return resp.json() as Promise<{
+      preview: Array<Record<string, unknown>>
+      steps: number
+      chart_base64: string
+    }>
   }
 
   const startProcessing = async (file: File) => {
     setIsUploading(true)
     setUploadError(null)
-    setUploadSteps((s) => s.map((st) => (st.id === "upload" ? { ...st, status: "processing", message: "Uploading file..." } : st)))
-    await callDummyUploadEndpoint(file)
-    await new Promise((r) => setTimeout(r, 700))
-    setUploadSteps((s) => s.map((st) => (st.id === "upload" ? { ...st, status: "completed", message: "File uploaded" } : st)))
 
-    setUploadSteps((s) => s.map((st) => (st.id === "validate" ? { ...st, status: "processing", message: "Validating file format..." } : st)))
-    await new Promise((r) => setTimeout(r, 800))
-    setUploadSteps((s) => s.map((st) => (st.id === "validate" ? { ...st, status: "completed", message: "Validation passed" } : st)))
+    try {
+      setUploadSteps((s) => s.map((st) => (st.id === "upload" ? { ...st, status: "processing", message: "Uploading file..." } : st)))
+      const result = await uploadToBackend(file)
+      setUploadSteps((s) => s.map((st) => (st.id === "upload" ? { ...st, status: "completed", message: "File uploaded" } : st)))
 
-    setUploadSteps((s) => s.map((st) => (st.id === "parse" ? { ...st, status: "processing", message: "Analyzing columns..." } : st)))
-    await new Promise((r) => setTimeout(r, 900))
-    const mockPreviewData = [
-      { date: "2024-01-01", actual: 1200, predicted: 1195, confidence_upper: 1255, confidence_lower: 1135 },
-      { date: "2024-01-02", actual: 1150, predicted: 1145, confidence_upper: 1205, confidence_lower: 1085 },
-      { date: "2024-01-03", actual: 1300, predicted: 1295, confidence_upper: 1355, confidence_lower: 1235 },
-    ]
-    const columns = Object.keys(mockPreviewData[0])
-    setFilePreview({ 
-      fileName: file.name, 
-      fileSize: file.size, 
-      rowCount: 1000, 
-      columnCount: columns.length, 
-      columns, 
-      previewData: mockPreviewData as Array<Record<string, unknown>>, 
-      validationErrors: [] 
-    })
-    setUploadSteps((s) => s.map((st) => (st.id === "parse" ? { ...st, status: "completed", message: `${columns.length} columns detected` } : st)))
+      setUploadSteps((s) => s.map((st) => (st.id === "validate" ? { ...st, status: "processing", message: "Validating file format..." } : st)))
+      // Basic client-side validation: ensure preview exists
+      if (!result.preview || !Array.isArray(result.preview) || result.preview.length === 0) {
+        throw new Error("Empty response preview from server")
+      }
+      setUploadSteps((s) => s.map((st) => (st.id === "validate" ? { ...st, status: "completed", message: "Validation passed" } : st)))
 
-    setUploadSteps((s) => s.map((st) => (st.id === "ready" ? { ...st, status: "processing", message: "Preparing results..." } : st)))
-    await new Promise((r) => setTimeout(r, 1200))
-    setUploadSteps((s) => s.map((st) => (st.id === "ready" ? { ...st, status: "completed", message: "Ready" } : st)))
+      setUploadSteps((s) => s.map((st) => (st.id === "parse" ? { ...st, status: "processing", message: "Analyzing columns..." } : st)))
+      const columns = Object.keys(result.preview[0])
+      setFilePreview({ 
+        fileName: file.name, 
+        fileSize: file.size, 
+        rowCount: result.preview.length, 
+        columnCount: columns.length, 
+        columns, 
+        previewData: result.preview as Array<Record<string, unknown>>, 
+        validationErrors: [] 
+      })
+      setUploadSteps((s) => s.map((st) => (st.id === "parse" ? { ...st, status: "completed", message: `${columns.length} columns detected` } : st)))
 
-    setIsUploading(false)
-    onProcessingComplete()
+      setUploadSteps((s) => s.map((st) => (st.id === "ready" ? { ...st, status: "processing", message: "Preparing results..." } : st)))
+      setUploadSteps((s) => s.map((st) => (st.id === "ready" ? { ...st, status: "completed", message: "Ready" } : st)))
+
+      setIsUploading(false)
+      onProcessingComplete(result)
+    } catch (err: unknown) {
+      setIsUploading(false)
+      const message = err instanceof Error ? err.message : "Upload failed"
+      setUploadError(message)
+      setUploadSteps((s) => s.map((st) => (st.id === "upload" ? { ...st, status: "error", message: "Upload failed" } : st)))
+    }
   }
 
   const handleFileUpload = (file: File) => { 
@@ -150,7 +179,7 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
               </div>
               <div>
                 <p className="font-medium text-gray-900">sarima_sample_dataset.csv</p>
-                <p className="text-sm text-gray-600">{getSampleData().length} records • 6 columns • 2.1 KB</p>
+                <p className="text-sm text-gray-600">{getSampleData().length} records • {Object.keys(getSampleData()[0]).length} columns • 2.1 KB</p>
               </div>
             </div>
             <Button onClick={handleDownload} className="bg-[#D96F32] hover:bg-[#C75D2C] text-white" disabled={isDownloaded}>
@@ -174,7 +203,7 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
               <li>Use this sample as a template for your own data</li>
               <li>Maintain the same column structure and data types</li>
               <li>Ensure your data covers sufficient historical periods</li>
-              <li>Remove or replace sample data with your actual values</li>
+              <li>CSV must contain <code>date</code> and <code>sales</code> columns</li>
             </ul>
           </div>
 
@@ -195,7 +224,7 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
         <Card>
           <CardHeader>
-            <CardTitle>Upload Your Data (CSV/XML)</CardTitle>
+            <CardTitle>Upload Your Data (CSV)</CardTitle>
           </CardHeader>
           <CardContent>
             <FileUploadZone 
