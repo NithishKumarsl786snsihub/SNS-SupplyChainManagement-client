@@ -2,7 +2,7 @@
 
 import { useState, ChangeEvent } from 'react'
 import axios from 'axios'
-import { CSVUploadProps, UploadResponse, ApiError } from '../../types/api'
+import { CSVUploadProps, UploadResponse, ApiError } from '@/types/api'
 
 interface ExtendedCSVUploadProps extends CSVUploadProps {
   modelType: 'arima' | 'arimax';
