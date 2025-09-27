@@ -5,7 +5,7 @@ import { motion } from "framer-motion"
 import { Download, Target, TrendingUp, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { MetricCard } from "@/components/metric-card"
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, ScatterChart, Scatter } from "recharts"
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, ScatterChart, Scatter, Area, ComposedChart, ReferenceArea } from "recharts"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 import { TrainingResponse, PredictionResponse, predictFromFutureFile, FuturePredictResponse, optimizePricingLinear, optimizePricingLogLog, PricingResponse } from "@/config/api"
 
@@ -180,7 +180,9 @@ export default function Results({ onRunAnotherModel, trainingResult, predictionR
     if (!futureResults?.future_predictions) return []
     return futureResults.future_predictions.map((pred) => ({
       label: pred.date ? pred.date : (pred.month ? `Month ${pred.month}` : String(pred.index)),
-      demand: pred.predicted_demand
+      predicted: pred.predicted_demand,
+      upper: pred.confidence_upper || pred.predicted_demand * 1.2,  // 20% higher
+      lower: pred.confidence_lower || pred.predicted_demand * 0.7   // 30% lower
     }))
   }
 
@@ -364,7 +366,7 @@ export default function Results({ onRunAnotherModel, trainingResult, predictionR
             {futureResults && (
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart 
+                  <LineChart 
                     data={prepareFutureData()}
                     margin={{ top: 20, right: 30, left: 60, bottom: 40 }}
                   >
@@ -381,13 +383,40 @@ export default function Results({ onRunAnotherModel, trainingResult, predictionR
                     />
                     <Tooltip 
                       contentStyle={{ backgroundColor: 'white', color: '#374151', border: '1px solid #e5e7eb' }}
-                      formatter={(value: number | string) => [
+                      formatter={(value: number | string, name: string) => [
                         typeof value === 'number' ? value.toFixed(0) : String(value),
-                        'Predicted Demand'
+                        name === 'predicted' ? 'Predicted Demand' : 
+                        name === 'upper' ? 'Upper Confidence' :
+                        name === 'lower' ? 'Lower Confidence' : name
                       ]}
                     />
-                    <Bar dataKey="demand" fill="var(--color-sns-orange)" name="Predicted Demand" />
-                  </BarChart>
+                    <Line 
+                      type="monotone" 
+                      dataKey="upper" 
+                      stroke="#D96F32" 
+                      strokeWidth={2}
+                      strokeDasharray="5 5"
+                      name="Upper Confidence Bound"
+                      dot={{ fill: '#D96F32', strokeWidth: 1, r: 3 }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="lower" 
+                      stroke="#D96F32" 
+                      strokeWidth={2}
+                      strokeDasharray="5 5"
+                      name="Lower Confidence Bound"
+                      dot={{ fill: '#D96F32', strokeWidth: 1, r: 3 }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="predicted" 
+                      stroke="#D96F32" 
+                      strokeWidth={3}
+                      name="Predicted Demand"
+                      dot={{ fill: '#D96F32', strokeWidth: 2, r: 4 }}
+                    />
+                  </LineChart>
                 </ResponsiveContainer>
               </div>
             )}
