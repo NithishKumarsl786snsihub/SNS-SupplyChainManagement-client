@@ -278,7 +278,7 @@ export default function Results({ datasetInfo, onRunAnotherModel }: ResultsProps
                  
 
                 {/* Prediction Controls */}
-                <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="mb-6 p-4 rounded-lg shadow-sm border ">
                   <h3 className="font-semibold text-blue-900 mb-3">Prediction Controls</h3>
                   
                   <div className="space-y-4">
@@ -398,7 +398,7 @@ export default function Results({ datasetInfo, onRunAnotherModel }: ResultsProps
               <CardContent>
               
                 {/* Optimization Controls */}
-                <div className="mb-6 p-4 bg-purple-50 rounded-lg border border-purple-200">
+                <div className="mb-6 p-4 shadow-md rounded-lg border ">
                   <h3 className="font-semibold text-purple-900 mb-3">Price Optimization Controls</h3>
                   
                   <div className="grid grid-cols-2 gap-3 mb-4">
@@ -454,7 +454,7 @@ export default function Results({ datasetInfo, onRunAnotherModel }: ResultsProps
                   <Button
                     onClick={optimizePrice}
                     disabled={optimizing || !modelInfo}
-                    className="bg-teal-600 hover:bg-teal-700 text-white "
+                    className="bg-sns-orange hover:bg-sns-orange-dark  text-white "
                   >
                     {optimizing ? 'Optimizing Prices...' : 'Optimize Pricing Strategy'}
                   </Button>
@@ -472,8 +472,7 @@ export default function Results({ datasetInfo, onRunAnotherModel }: ResultsProps
                 )}
 
               
-
-                {/* Optimization Results */}
+ {/* Optimization Results */}
                 {optimizationResults && (
                   <div className="mt-6">
                     <h3 className="text-lg font-semibold mb-4 flex items-center">
@@ -482,7 +481,30 @@ export default function Results({ datasetInfo, onRunAnotherModel }: ResultsProps
                       </svg>
                       Price Optimization Analysis
                     </h3>
-                    
+                        {optimizationResults.best_price && (
+                      <div className="p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg border mb-10 border-green-200">
+                        <h4 className="font-semibold text-green-900 mb-3 flex items-center">
+                          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Optimal Pricing Recommendation
+                        </h4>
+                        <div className="grid grid-cols-3 gap-4 text-center">
+                          <div className="bg-white p-3 rounded-lg shadow-sm">
+                            <div className="text-2xl font-bold text-green-600">${optimizationResults.best_price.price.toFixed(2)}</div>
+                            <div className="text-sm text-gray-600">Optimal Price</div>
+                          </div>
+                          <div className="bg-white p-3 rounded-lg shadow-sm">
+                            <div className="text-2xl font-bold text-blue-600">${optimizationResults.best_price.profit.toFixed(2)}</div>
+                            <div className="text-sm text-gray-600">Expected Profit</div>
+                          </div>
+                          <div className="bg-white p-3 rounded-lg shadow-sm">
+                            <div className="text-2xl font-bold text-purple-600">{optimizationResults.best_price.predicted_demand.toFixed(0)}</div>
+                            <div className="text-sm text-gray-600">Expected Demand</div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                       <div>
                         <h4 className="font-semibold text-gray-900 mb-4">Demand & Profit vs Price</h4>
@@ -526,32 +548,10 @@ export default function Results({ datasetInfo, onRunAnotherModel }: ResultsProps
                       </div>
                     </div>
 
-                    {optimizationResults.best_price && (
-                      <div className="p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg border border-green-200">
-                        <h4 className="font-semibold text-green-900 mb-3 flex items-center">
-                          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          Optimal Pricing Recommendation
-                        </h4>
-                        <div className="grid grid-cols-3 gap-4 text-center">
-                          <div className="bg-white p-3 rounded-lg shadow-sm">
-                            <div className="text-2xl font-bold text-green-600">${optimizationResults.best_price.price.toFixed(2)}</div>
-                            <div className="text-sm text-gray-600">Optimal Price</div>
-                          </div>
-                          <div className="bg-white p-3 rounded-lg shadow-sm">
-                            <div className="text-2xl font-bold text-blue-600">${optimizationResults.best_price.profit.toFixed(2)}</div>
-                            <div className="text-sm text-gray-600">Expected Profit</div>
-                          </div>
-                          <div className="bg-white p-3 rounded-lg shadow-sm">
-                            <div className="text-2xl font-bold text-purple-600">{optimizationResults.best_price.predicted_demand.toFixed(0)}</div>
-                            <div className="text-sm text-gray-600">Expected Demand</div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                
                   </div>
                 )}
+               
               </CardContent>
             </Card>
 
