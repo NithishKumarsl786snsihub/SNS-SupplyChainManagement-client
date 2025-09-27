@@ -37,13 +37,34 @@ export function FilePreview({
 
   return (
     <div className="space-y-6">
-      {/* File Info */}
+      {/* Combined: File Info + Validation Badge + Detected Columns */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5 text-sns-orange" />
-            File Information
-          </CardTitle>
+          <div className="flex items-start justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-sns-orange" />
+              File Information
+            </CardTitle>
+            <span
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium border ${
+                hasErrors
+                  ? "bg-red-50 text-red-700 border-red-200"
+                  : "bg-green-50 text-green-700 border-green-200"
+              }`}
+            >
+              {hasErrors ? (
+                <>
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  Validation Issues
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="h-3.5 w-3.5" />
+                  File Validation Passed
+                </>
+              )}
+            </span>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -64,46 +85,22 @@ export function FilePreview({
               <p className="font-medium text-gray-900">{columnCount}</p>
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Validation Status */}
-      <Card className={hasErrors ? "border-red-200 bg-red-50" : "border-green-200 bg-green-50"}>
-        <CardContent className="p-4">
-          <div className="flex items-center gap-3">
-            {hasErrors ? (
-              <AlertTriangle className="h-5 w-5 text-red-600" />
-            ) : (
-              <CheckCircle className="h-5 w-5 text-green-600" />
-            )}
-            <div className="flex-1">
-              <p className={`font-medium ${hasErrors ? "text-red-900" : "text-green-900"}`}>
-                {hasErrors ? "Validation Issues Found" : "File Validation Passed"}
-              </p>
-              {hasErrors && (
-                <ul className="text-sm text-red-700 mt-2 space-y-1">
-                  {validationErrors.map((error, index) => (
-                    <li key={index}>• {error}</li>
-                  ))}
-                </ul>
-              )}
+          {hasErrors && validationErrors.length > 0 && (
+            <ul className="text-sm text-red-700 mt-4 space-y-1">
+              {validationErrors.map((error, index) => (
+                <li key={index}>• {error}</li>
+              ))}
+            </ul>
+          )}
+          <div className="mt-6">
+            <h4 className="text-sm font-semibold text-gray-900 mb-2">Detected Columns</h4>
+            <div className="flex flex-wrap gap-2">
+              {columns.map((column, index) => (
+                <Badge key={index} variant="outline" className="border-sns-orange text-sns-orange">
+                  {column}
+                </Badge>
+              ))}
             </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Column Information */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Detected Columns</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-2">
-            {columns.map((column, index) => (
-              <Badge key={index} variant="outline" className="border-sns-orange text-sns-orange">
-                {column}
-              </Badge>
-            ))}
           </div>
         </CardContent>
       </Card>
