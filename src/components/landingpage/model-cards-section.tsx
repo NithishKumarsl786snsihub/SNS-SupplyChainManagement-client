@@ -54,6 +54,11 @@ export function ModelCardsSection() {
       description: "Seasonal ARIMA for cyclical data with seasonal pattern recognition",
       category: "time-series" as const,
     },
+   {
+      name: "SARIMAX",
+      description: "Seasonal ARIMA with eXogenous variables for time series forecasting with external factors and seasonal patterns",
+      category: "time-series" as const,
+    },
     {
       name: "ARIMAX",
       description: "ARIMA with external variables for incorporating additional predictors",
@@ -101,6 +106,7 @@ export function ModelCardsSection() {
                   model.name.startsWith("TFT") ? "tft" :
                   model.name === "ARIMA" ? "arima" :
                   model.name === "SARIMA" ? "sarima" :
+                   model.name === "SARIMAX" ? "sarimax" :
                   model.name === "ARIMAX" ? "arimax" :
                   model.name === "Prophet" ? "prophet" :
                   model.name === "VARIMA" ? "varima" : "xgboost"
