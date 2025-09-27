@@ -6,6 +6,21 @@ import { ResultsSidebar } from "@/components/sidebar"
 import Upload from "./upload"
 import Results from "./results"
 
+type XGBPredictionRow = {
+  StoreID: string
+  ProductID: string
+  Date: string
+  PredictedMonthlyDemand: number
+}
+
+type XGBApiResponse = {
+  count: number
+  predictions: XGBPredictionRow[]
+}
+
+type CategoryMap = Record<string, string>
+type ContextMap = Record<string, Record<string, unknown>>
+
 export default function XGBoostResultsPage() {
   const breadcrumbItems = [
     { label: "Home", href: "/" },
@@ -14,13 +29,21 @@ export default function XGBoostResultsPage() {
   ]
 
   const [processingDone, setProcessingDone] = useState(false)
+  const [apiResult, setApiResult] = useState<XGBApiResponse | null>(null)
+  const [categoryMap, setCategoryMap] = useState<CategoryMap>({})
+  const [contextMap, setContextMap] = useState<ContextMap>({})
 
-  const handleProcessingComplete = () => {
+  const handleProcessingComplete = (response: XGBApiResponse, categories: CategoryMap, contexts: ContextMap) => {
+    setApiResult(response)
+    setCategoryMap(categories)
+    setContextMap(contexts)
     setProcessingDone(true)
   }
 
   const handleRunAnotherModel = () => {
     setProcessingDone(false)
+    setApiResult(null)
+    setCategoryMap({})
   }
 
   return (
@@ -34,7 +57,7 @@ export default function XGBoostResultsPage() {
           </div>
         </>
       ) : (
-        <Results onRunAnotherModel={handleRunAnotherModel} />
+        <Results onRunAnotherModel={handleRunAnotherModel} predictions={apiResult?.predictions ?? []} categoryMap={categoryMap} contextMap={contextMap} />
       )}
     </div>
   )

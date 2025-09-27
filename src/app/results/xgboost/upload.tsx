@@ -27,8 +27,20 @@ interface FilePreviewState {
   validationErrors: string[] 
 }
 
+type XGBPredictionRow = {
+  StoreID: string
+  ProductID: string
+  Date: string
+  PredictedMonthlyDemand: number
+}
+
+type XGBApiResponse = {
+  count: number
+  predictions: XGBPredictionRow[]
+}
+
 interface UploadProps {
-  onProcessingComplete: () => void
+  onProcessingComplete: (response: XGBApiResponse, categoryMap: Record<string, string>, contextMap: Record<string, Record<string, unknown>>) => void
 }
 
 export default function Upload({ onProcessingComplete }: UploadProps) {
@@ -44,11 +56,204 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
   ])
   const [filePreview, setFilePreview] = useState<FilePreviewState | null>(null)
 
-  // Sample dataset used in the Dataset Preview card
-  const getSampleData = () => [
-    { Date: "2024-01-01", Demand: 1100, Price: 24, "Inventory Level": 4200, "Seasonal Factor": 1.1, Promotional: 0 },
-    { Date: "2024-01-02", Demand: 1050, Price: 24, "Inventory Level": 4050, "Seasonal Factor": 1.1, Promotional: 0 },
-    { Date: "2024-01-03", Demand: 1200, Price: 23, "Inventory Level": 3900, "Seasonal Factor": 1.1, Promotional: 1 },
+  // Required headers (exact match) based on backend sample_input.csv
+  const requiredHeaders = [
+    "Date",
+    "StoreID",
+    "ProductID",
+    "ProductName",
+    "Category",
+    "SubCategory",
+    "City",
+    "Region",
+    "Price",
+    "DiscountPct",
+    "PromotionFlag",
+    "CompetitionPrice",
+    "Season",
+    "HolidayFlag",
+    "HolidayName",
+    "AdSpend",
+    "UnemploymentRate",
+    "Inflation",
+    "Temperature",
+    "Precipitation",
+    "MedianIncome",
+    "CompetitorStoresNearby",
+  ] as const
+
+  type RequiredHeader = typeof requiredHeaders[number]
+
+  // Sample dataset used in the Dataset Preview card and for sample CSV download
+  const getSampleData = (): Array<Record<RequiredHeader, unknown>> => [
+    {
+      Date: "2024-01-01",
+      StoreID: "S001",
+      ProductID: "P001",
+      ProductName: "T-Shirt Basic",
+      Category: "T-Shirt",
+      SubCategory: "Basic",
+      City: "Bhubaneswar",
+      Region: "East",
+      Price: 925,
+      DiscountPct: 12,
+      PromotionFlag: 0,
+      CompetitionPrice: 759,
+      Season: "Winter",
+      HolidayFlag: 0,
+      HolidayName: "",
+      AdSpend: 519,
+      UnemploymentRate: 6.013890880411348,
+      Inflation: 5.453264869089431,
+      Temperature: 17.38800277190036,
+      Precipitation: 16,
+      MedianIncome: 38921,
+      CompetitorStoresNearby: 15,
+    },
+    {
+      Date: "2024-02-01",
+      StoreID: "S001",
+      ProductID: "P001",
+      ProductName: "T-Shirt Basic",
+      Category: "T-Shirt",
+      SubCategory: "Basic",
+      City: "Bhubaneswar",
+      Region: "East",
+      Price: 1985,
+      DiscountPct: 5,
+      PromotionFlag: 0,
+      CompetitionPrice: 1977,
+      Season: "Winter",
+      HolidayFlag: 0,
+      HolidayName: "",
+      AdSpend: 2172,
+      UnemploymentRate: 6.228196763887352,
+      Inflation: 5.907182589647006,
+      Temperature: 29.305207652983846,
+      Precipitation: 4,
+      MedianIncome: 39225,
+      CompetitorStoresNearby: 18,
+    },
+    {
+      Date: "2024-03-01",
+      StoreID: "S001",
+      ProductID: "P001",
+      ProductName: "T-Shirt Basic",
+      Category: "T-Shirt",
+      SubCategory: "Basic",
+      City: "Bhubaneswar",
+      Region: "East",
+      Price: 1772,
+      DiscountPct: 5,
+      PromotionFlag: 0,
+      CompetitionPrice: 2092,
+      Season: "Spring",
+      HolidayFlag: 0,
+      HolidayName: "",
+      AdSpend: 2736,
+      UnemploymentRate: 6.847477034017266,
+      Inflation: 5.745930078837414,
+      Temperature: 21.887351306780293,
+      Precipitation: 24,
+      MedianIncome: 41571,
+      CompetitorStoresNearby: 6,
+    },
+    {
+      Date: "2024-04-01",
+      StoreID: "S001",
+      ProductID: "P001",
+      ProductName: "T-Shirt Basic",
+      Category: "T-Shirt",
+      SubCategory: "Basic",
+      City: "Bhubaneswar",
+      Region: "East",
+      Price: 852,
+      DiscountPct: 3,
+      PromotionFlag: 0,
+      CompetitionPrice: 853,
+      Season: "Spring",
+      HolidayFlag: 0,
+      HolidayName: "",
+      AdSpend: 3578,
+      UnemploymentRate: 6.971297137461472,
+      Inflation: 5.137490084204322,
+      Temperature: 23.57806256059253,
+      Precipitation: 25,
+      MedianIncome: 41368,
+      CompetitorStoresNearby: 13,
+    },
+    {
+      Date: "2024-05-01",
+      StoreID: "S001",
+      ProductID: "P001",
+      ProductName: "T-Shirt Basic",
+      Category: "T-Shirt",
+      SubCategory: "Basic",
+      City: "Bhubaneswar",
+      Region: "East",
+      Price: 713,
+      DiscountPct: 13,
+      PromotionFlag: 1,
+      CompetitionPrice: 1427,
+      Season: "Spring",
+      HolidayFlag: 0,
+      HolidayName: "NewYear",
+      AdSpend: 158,
+      UnemploymentRate: 6.57111464002144,
+      Inflation: 5.787379977222721,
+      Temperature: 15.76789696561495,
+      Precipitation: 38,
+      MedianIncome: 38965,
+      CompetitorStoresNearby: 8,
+    },
+    {
+      Date: "2024-06-01",
+      StoreID: "S001",
+      ProductID: "P001",
+      ProductName: "T-Shirt Basic",
+      Category: "T-Shirt",
+      SubCategory: "Basic",
+      City: "Bhubaneswar",
+      Region: "East",
+      Price: 837,
+      DiscountPct: 11,
+      PromotionFlag: 0,
+      CompetitionPrice: 849,
+      Season: "Summer",
+      HolidayFlag: 0,
+      HolidayName: "",
+      AdSpend: 4671,
+      UnemploymentRate: 6.729315457231535,
+      Inflation: 5.269760244202389,
+      Temperature: 15.660778760512423,
+      Precipitation: 39,
+      MedianIncome: 39237,
+      CompetitorStoresNearby: 4,
+    },
+    {
+      Date: "2024-07-01",
+      StoreID: "S001",
+      ProductID: "P001",
+      ProductName: "T-Shirt Basic",
+      Category: "T-Shirt",
+      SubCategory: "Basic",
+      City: "Bhubaneswar",
+      Region: "East",
+      Price: 717,
+      DiscountPct: 7,
+      PromotionFlag: 0,
+      CompetitionPrice: 1227,
+      Season: "Summer",
+      HolidayFlag: 0,
+      HolidayName: "NewYear",
+      AdSpend: 3001,
+      UnemploymentRate: 6.013909130249806,
+      Inflation: 5.842085418357616,
+      Temperature: 29.483405209512213,
+      Precipitation: 11,
+      MedianIncome: 38569,
+      CompetitorStoresNearby: 8,
+    },
   ]
 
   const handleDownload = () => {
@@ -68,56 +273,157 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
     setTimeout(() => setIsDownloaded(false), 2000)
   }
 
-  const callDummyUploadEndpoint = async (file: File) => {
+  const validateCsvHeaders = async (file: File): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      const text = await file.text()
+      const firstLine = text.split(/\r?\n/)[0] ?? ""
+      const incoming = firstLine.split(",").map((h) => h.trim())
+      const required = [...requiredHeaders]
+
+      const missing = required.filter((h) => !incoming.includes(h))
+      const extra = incoming.filter((h) => !required.includes(h as RequiredHeader))
+
+      if (missing.length > 0) {
+        return { ok: false, error: `Missing required columns: ${missing.join(", ")}` }
+      }
+      if (extra.length > 0) {
+        return { ok: false, error: `Unexpected columns present: ${extra.join(", ")}` }
+      }
+      // Also enforce exact order match to avoid mapping ambiguity
+      const orderMatches = required.every((h, idx) => incoming[idx] === h)
+      if (!orderMatches) {
+        return { ok: false, error: "Column order must exactly match the template sample." }
+      }
+      return { ok: true }
+    } catch (e) {
+      return { ok: false, error: "Unable to read the CSV file for validation." }
+    }
+  }
+
+  const uploadToBackend = async (file: File): Promise<XGBApiResponse> => {
     const formData = new FormData()
     formData.append("file", file)
-    formData.append("model", "xgboost")
-    try { 
-      await fetch("/api/dummy-upload/xgboost", { method: "POST", body: formData }) 
-    } catch {}
+    const resp = await fetch("http://127.0.0.1:8000/api/m1/", {
+      method: "POST",
+      body: formData,
+    })
+    if (!resp.ok) {
+      const errText = await resp.text().catch(() => "")
+      throw new Error(errText || `Upload failed with status ${resp.status}`)
+    }
+    return (await resp.json()) as XGBApiResponse
   }
 
   const startProcessing = async (file: File) => {
     setIsUploading(true)
     setUploadError(null)
     setUploadSteps((s) => s.map((st) => (st.id === "upload" ? { ...st, status: "processing", message: "Uploading file..." } : st)))
-    await callDummyUploadEndpoint(file)
-    await new Promise((r) => setTimeout(r, 700))
-    setUploadSteps((s) => s.map((st) => (st.id === "upload" ? { ...st, status: "completed", message: "File uploaded" } : st)))
+    let apiResponse: XGBApiResponse | null = null
+    try {
+      apiResponse = await uploadToBackend(file)
+      setUploadSteps((s) => s.map((st) => (st.id === "upload" ? { ...st, status: "completed", message: "File uploaded" } : st)))
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to upload"
+      setUploadSteps((s) => s.map((st) => (st.id === "upload" ? { ...st, status: "error", message: msg } : st)))
+      setIsUploading(false)
+      setUploadError(msg)
+      return
+    }
 
     setUploadSteps((s) => s.map((st) => (st.id === "validate" ? { ...st, status: "processing", message: "Validating file format..." } : st)))
-    await new Promise((r) => setTimeout(r, 800))
+    const validation = await validateCsvHeaders(file)
+    await new Promise((r) => setTimeout(r, 300))
+    if (!validation.ok) {
+      setUploadSteps((s) => s.map((st) => (st.id === "validate" ? { ...st, status: "error", message: validation.error } : st)))
+      setIsUploading(false)
+      setUploadError(validation.error ?? "Validation failed")
+      return
+    }
     setUploadSteps((s) => s.map((st) => (st.id === "validate" ? { ...st, status: "completed", message: "Validation passed" } : st)))
 
-    setUploadSteps((s) => s.map((st) => (st.id === "parse" ? { ...st, status: "processing", message: "Analyzing columns..." } : st)))
-    await new Promise((r) => setTimeout(r, 900))
-    const mockPreviewData = [
-      { date: "2024-01-01", actual: 1100, predicted: 1095, confidence_upper: 1155, confidence_lower: 1035 },
-      { date: "2024-01-02", actual: 1050, predicted: 1045, confidence_upper: 1105, confidence_lower: 985 },
-      { date: "2024-01-03", actual: 1200, predicted: 1195, confidence_upper: 1255, confidence_lower: 1135 },
-    ]
-    const columns = Object.keys(mockPreviewData[0])
-    setFilePreview({ 
-      fileName: file.name, 
-      fileSize: file.size, 
-      rowCount: 1000, 
-      columnCount: columns.length, 
-      columns, 
-      previewData: mockPreviewData as Array<Record<string, unknown>>, 
-      validationErrors: [] 
+    setUploadSteps((s) => s.map((st) => (st.id === "parse" ? { ...st, status: "processing", message: "Analyzing response..." } : st)))
+    const firstFew = (apiResponse?.predictions || []).slice(0, 3)
+    const columns = ["StoreID", "ProductID", "Date", "PredictedMonthlyDemand"]
+    setFilePreview({
+      fileName: file.name,
+      fileSize: file.size,
+      rowCount: apiResponse?.count || 0,
+      columnCount: columns.length,
+      columns,
+      previewData: firstFew as Array<Record<string, unknown>>,
+      validationErrors: [],
     })
-    setUploadSteps((s) => s.map((st) => (st.id === "parse" ? { ...st, status: "completed", message: `${columns.length} columns detected` } : st)))
+    setUploadSteps((s) => s.map((st) => (st.id === "parse" ? { ...st, status: "completed", message: `${apiResponse?.count || 0} predictions` } : st)))
 
     setUploadSteps((s) => s.map((st) => (st.id === "ready" ? { ...st, status: "processing", message: "Preparing results..." } : st)))
     await new Promise((r) => setTimeout(r, 1200))
     setUploadSteps((s) => s.map((st) => (st.id === "ready" ? { ...st, status: "completed", message: "Ready" } : st)))
 
+    // Build (StoreID, ProductID) -> Category map and full context map from the uploaded CSV on the client
+    let categoryMap: Record<string, string> = {}
+    let contextMap: Record<string, Record<string, unknown>> = {}
+    try {
+      const text = await file.text()
+      const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0)
+      const header = (lines[0] || "").split(",")
+      const storeIdx = header.indexOf("StoreID")
+      const productIdx = header.indexOf("ProductID")
+      const categoryIdx = header.indexOf("Category")
+      const dateIdx = header.indexOf("Date")
+      if (storeIdx >= 0 && productIdx >= 0 && categoryIdx >= 0) {
+        for (let i = 1; i < lines.length; i++) {
+          const parts = lines[i].split(",")
+          if (parts.length !== header.length) continue
+          const store = parts[storeIdx]?.trim()
+          const product = parts[productIdx]?.trim()
+          const category = parts[categoryIdx]?.trim()
+          const date = dateIdx >= 0 ? parts[dateIdx]?.trim() : undefined
+          if (store && product && category) {
+            const key = `${store}::${product}`
+            if (!categoryMap[key]) categoryMap[key] = category
+          }
+          // Build full context map keyed by StoreID::ProductID::Date
+          if (store && product && date) {
+            const ctxKey = `${store}::${product}::${date}`
+            if (!contextMap[ctxKey]) {
+              const obj: Record<string, unknown> = {}
+              for (let c = 0; c < header.length; c++) {
+                const col = header[c]
+                let val: unknown = parts[c]
+                // best-effort numeric parse for numeric-like fields
+                if ([
+                  "Price","DiscountPct","PromotionFlag","CompetitionPrice","HolidayFlag","AdSpend","UnemploymentRate","Inflation","Temperature","Precipitation","MedianIncome","CompetitorStoresNearby"
+                ].includes(col)) {
+                  const num = Number(parts[c])
+                  val = Number.isFinite(num) ? num : parts[c]
+                }
+                obj[col] = (val ?? "").toString() === "" ? "" : val
+              }
+              contextMap[ctxKey] = obj
+            }
+          }
+        }
+      }
+    } catch {}
+
     setIsUploading(false)
-    onProcessingComplete()
+    if (apiResponse) {
+      onProcessingComplete(apiResponse, categoryMap, contextMap)
+    }
   }
 
-  const handleFileUpload = (file: File) => { 
+  const handleFileUpload = async (file: File) => { 
     setUploadedFile(file)
+    setUploadError(null)
+    // Early header validation before starting processing
+    setUploadSteps((s) => s.map((st) => (st.id === "validate" ? { ...st, status: "processing", message: "Checking headers..." } : st)))
+    const validation = await validateCsvHeaders(file)
+    if (!validation.ok) {
+      setUploadSteps((s) => s.map((st) => (st.id === "validate" ? { ...st, status: "error", message: validation.error } : st)))
+      setUploadError(validation.error ?? "Invalid CSV headers")
+      return
+    }
+    setUploadSteps((s) => s.map((st) => (st.id === "validate" ? { ...st, status: "completed", message: "Headers verified" } : st)))
     startProcessing(file) 
   }
 
@@ -144,13 +450,13 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-between p-4 bg-[#F3E9DC]/50 rounded-lg mb-4">
-            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3">
               <div className="bg-green-100 p-2 rounded-lg">
                 <FileText className="h-6 w-6 text-green-600" />
               </div>
               <div>
                 <p className="font-medium text-gray-900">xgboost_sample_dataset.csv</p>
-                <p className="text-sm text-gray-600">{getSampleData().length} records • 6 columns • 2.1 KB</p>
+                  <p className="text-sm text-gray-600">{getSampleData().length} records • {Object.keys(getSampleData()[0]).length} columns</p>
               </div>
             </div>
             <Button onClick={handleDownload} className="bg-[#D96F32] hover:bg-[#C75D2C] text-white" disabled={isDownloaded}>

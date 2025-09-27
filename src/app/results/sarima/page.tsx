@@ -6,6 +6,12 @@ import { ResultsSidebar } from "@/components/sidebar"
 import Upload from "./upload"
 import Results from "./results"
 
+interface SarimaResultPayload {
+  preview: Array<Record<string, unknown>>
+  steps: number
+  chart_base64: string
+}
+
 export default function SARIMAResultsPage() {
   const breadcrumbItems = [
     { label: "Home", href: "/" },
@@ -14,13 +20,16 @@ export default function SARIMAResultsPage() {
   ]
 
   const [processingDone, setProcessingDone] = useState(false)
+  const [sarimaResult, setSarimaResult] = useState<SarimaResultPayload | null>(null)
 
-  const handleProcessingComplete = () => {
+  const handleProcessingComplete = (result: SarimaResultPayload) => {
+    setSarimaResult(result)
     setProcessingDone(true)
   }
 
   const handleRunAnotherModel = () => {
     setProcessingDone(false)
+    setSarimaResult(null)
   }
 
   return (
@@ -34,7 +43,7 @@ export default function SARIMAResultsPage() {
           </div>
         </>
       ) : (
-        <Results onRunAnotherModel={handleRunAnotherModel} />
+        <Results onRunAnotherModel={handleRunAnotherModel} result={sarimaResult} />
       )}
     </div>
   )
