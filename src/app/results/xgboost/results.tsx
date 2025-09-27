@@ -86,8 +86,12 @@ export default function Results({ onRunAnotherModel, predictions, categoryMap, c
     const firstStore = storeOptions[0]?.store
     if (firstStore) {
       setSelectedStore(firstStore)
-      const firstProduct = (storeToProducts.get(firstStore) && Array.from(storeToProducts.get(firstStore)!).sort((a, b) => a.localeCompare(b))[0]) || ""
-      if (firstProduct) setSelectedProduct(firstProduct)
+      const productSet = storeToProducts.get(firstStore)
+      if (productSet) {
+        const sorted = Array.from(productSet).sort((a, b) => a.localeCompare(b))
+        const defaultProduct = productSet.has("P001") ? "P001" : (sorted[0] || "")
+        if (defaultProduct) setSelectedProduct(defaultProduct)
+      }
       return true
     }
     return false
@@ -226,7 +230,17 @@ export default function Results({ onRunAnotherModel, predictions, categoryMap, c
         <div className="mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Store ({storeOptions.length} total)</label>
-            <Select value={selectedStore} onValueChange={(v) => { setSelectedStore(v); setSelectedProduct("") }}>
+            <Select value={selectedStore} onValueChange={(v) => {
+              setSelectedStore(v)
+              const productSet = storeToProducts.get(v)
+              if (productSet) {
+                const sorted = Array.from(productSet).sort((a, b) => a.localeCompare(b))
+                const defaultProduct = productSet.has("P001") ? "P001" : (sorted[0] || "")
+                setSelectedProduct(defaultProduct)
+              } else {
+                setSelectedProduct("")
+              }
+            }}>
               <SelectTrigger className="w-full bg-white/60 backdrop-blur-md border border-white/40 rounded-xl shadow-[0_8px_24px_rgba(0,0,0,0.06)]">
                 <SelectValue placeholder="All stores" />
               </SelectTrigger>
@@ -346,10 +360,22 @@ export default function Results({ onRunAnotherModel, predictions, categoryMap, c
                 )
               })()}
               {optimalPoint && (
-                <div className="mt-3 text-sm">
-                  <span className="font-medium">Optimal Price:</span> {optimalPoint.price.toFixed(2)} • 
-                  <span className="ml-2 font-medium">Demand:</span> {optimalPoint.predicted_demand.toFixed(2)} • 
-                  <span className="ml-2 font-medium">Revenue:</span> {optimalPoint.revenue.toFixed(2)}
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <MetricCard
+                    title="Optimal Price"
+                    value={`₹ ${optimalPoint.price.toFixed(2)}`}
+                    description="Price that maximizes revenue for the selected month"
+                  />
+                  <MetricCard
+                    title="Predicted Demand"
+                    value={new Intl.NumberFormat("en").format(Number(optimalPoint.predicted_demand.toFixed(2)))}
+                    description="Units expected at the optimal price"
+                  />
+                  <MetricCard
+                    title="Revenue"
+                    value={`₹ ${new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(Number(optimalPoint.revenue.toFixed(2)))}`}
+                    description="Projected monthly revenue at the optimal price"
+                  />
                 </div>
               )}
             </div>
