@@ -1,89 +1,104 @@
 "use client"
 
 import { useState } from "react"
-import Papa from "papaparse"
 import { Button } from "@/components/ui/button"
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { FileUploadZone } from "@/components/file-upload-zone"
+import { UploadProgress } from "@/components/upload-progress"
 import LoaderSpinner from "@/components/ui/loader"
+import axios from "axios"
 
-interface UploadProps {
-  onProcessingComplete: (data: any[]) => void
+interface UploadStep {
+  id: string
+  label: string
+  status: "pending" | "processing" | "completed" | "error"
+  message?: string
 }
 
-export default function Upload({ onProcessingComplete }: UploadProps) {
+interface UploadProps {
+  onProcessingComplete: (data: any) => void
+  modelName: string
+}
+
+export default function Upload({ onProcessingComplete, modelName }: UploadProps) {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)
-  const [dataPreview, setDataPreview] = useState<any[]>([])
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [uploadSteps, setUploadSteps] = useState<UploadStep[]>([
+    { id: "upload", label: "File Upload", status: "pending" },
+    { id: "analyze", label: "Analyzing & Forecasting", status: "pending" },
+    { id: "done", label: "Ready for Results", status: "pending" },
+  ])
+
+  const startProcessing = async (file: File) => {
+    setIsUploading(true)
+    setUploadError(null)
+
+    try {
+      // Step 1: Upload
+      setUploadSteps((s) => s.map((st) => st.id === "upload" ? { ...st, status: "processing" } : st))
+      await new Promise((r) => setTimeout(r, 700))
+      setUploadSteps((s) => s.map((st) => st.id === "upload" ? { ...st, status: "completed" } : st))
+
+      // Step 2: Call API
+      setUploadSteps((s) => s.map((st) => st.id === "analyze" ? { ...st, status: "processing" } : st))
+      const formData = new FormData()
+      formData.append("file", file)
+
+      const response = await axios.post("http://localhost:8000/api/prophet_forecast/", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+
+      setUploadSteps((s) => s.map((st) => st.id === "analyze" ? { ...st, status: "completed" } : st))
+      setUploadSteps((s) => s.map((st) => st.id === "done" ? { ...st, status: "completed" } : st))
+
+      onProcessingComplete(response.data)
+    } catch (err: any) {
+      console.error(err)
+      setUploadError("Error uploading or processing file.")
+      setUploadSteps((s) => s.map((st) => st.id === "analyze" ? { ...st, status: "error" } : st))
+    } finally {
+      setIsUploading(false)
+    }
+  }
 
   const handleFileUpload = (file: File) => {
     setUploadedFile(file)
-    setIsUploading(true)
+    startProcessing(file)
+  }
 
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        setDataPreview(results.data)
-        setTimeout(() => {
-          setIsUploading(false)
-          onProcessingComplete(results.data)
-        }, 800)
-      },
-      error: (err) => {
-        console.error(err)
-        setIsUploading(false)
-      },
-    })
+  const handleFileRemove = () => {
+    setUploadedFile(null)
+    setUploadError(null)
+    setUploadSteps((prev) => prev.map((s) => ({ ...s, status: "pending" as const, message: undefined })))
   }
 
   return (
     <>
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Upload Your CSV File</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <input
-            type="file"
-            accept=".csv"
-            onChange={(e) => e.target.files && handleFileUpload(e.target.files[0])}
-            className="p-2 border rounded w-full"
-          />
-        </CardContent>
-      </Card>
+      <div className="mt-8 mb-4">
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Upload Your Data</h2>
+        <p className="text-gray-600">Upload your CSV file. It will be analyzed and sent for forecasting with {modelName}.</p>
+      </div>
 
-      {isUploading && <LoaderSpinner fullscreen size="md" message="Processing CSV data..." />}
-
-      {dataPreview.length > 0 && (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
         <Card>
           <CardHeader>
-            <CardTitle>Preview Uploaded Data</CardTitle>
+            <CardTitle>Upload CSV File</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto max-h-64">
-              <table className="table-auto w-full border-collapse border border-gray-300">
-                <thead>
-                  <tr>
-                    {Object.keys(dataPreview[0]).map((key) => (
-                      <th key={key} className="border px-2 py-1 text-left bg-gray-100">{key}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {dataPreview.slice(0, 5).map((row, idx) => (
-                    <tr key={idx}>
-                      {Object.values(row).map((val, i) => (
-                        <td key={i} className="border px-2 py-1">{val}</td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {dataPreview.length > 5 && <p className="text-sm text-gray-500 mt-1">Showing first 5 rows...</p>}
-            </div>
+            <FileUploadZone
+              onFileUpload={handleFileUpload}
+              onFileRemove={handleFileRemove}
+              uploadedFile={uploadedFile}
+              isUploading={isUploading}
+              uploadError={uploadError}
+            />
           </CardContent>
         </Card>
-      )}
+        <UploadProgress steps={uploadSteps} />
+      </div>
+
+      {isUploading && <LoaderSpinner message="Processing your data..." />}
     </>
   )
 }

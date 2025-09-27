@@ -7,7 +7,7 @@ import Results from "./results"
 
 export default function ProphetPage() {
   const [processingDone, setProcessingDone] = useState(false)
-  const [uploadedData, setUploadedData] = useState<any[]>([])
+  const [results, setResults] = useState<any>(null)
 
   const breadcrumbItems = [
     { label: "Home", href: "/" },
@@ -15,14 +15,14 @@ export default function ProphetPage() {
     { label: "Prophet", current: true },
   ]
 
-  const handleProcessingComplete = (data: any[]) => {
-    setUploadedData(data)
+  const handleProcessingComplete = (apiResults: any) => {
+    setResults(apiResults)
     setProcessingDone(true)
   }
 
   const handleRunAnotherModel = () => {
     setProcessingDone(false)
-    setUploadedData([])
+    setResults(null)
   }
 
   return (
@@ -30,9 +30,9 @@ export default function ProphetPage() {
       <div className="px-4 sm:px-6 lg:px-8 py-8">
         <BreadcrumbNav items={breadcrumbItems} />
         {!processingDone ? (
-          <Upload onProcessingComplete={handleProcessingComplete} />
+          <Upload modelName="Prophet" onProcessingComplete={handleProcessingComplete} />
         ) : (
-          <Results data={uploadedData} onRunAnotherModel={handleRunAnotherModel} />
+          <Results data={results} onRunAnotherModel={handleRunAnotherModel} />
         )}
       </div>
     </div>
