@@ -205,10 +205,10 @@ export default function Results({ onRunAnotherModel, trainingResult, predictionR
               <p className="text-lg text-gray-600 max-w-3xl">Simple, interpretable baseline model for understanding linear relationships in your supply chain data.</p>
             </div>
             <div className="flex items-center gap-3">
-              <Button variant="outline" className="border-sns-orange text-sns-orange hover:bg-sns-orange hover:text-white bg-transparent">
+              {/* <Button variant="outline" className="border-sns-orange text-sns-orange hover:bg-sns-orange hover:text-white bg-transparent">
                 <Download className="h-4 w-4 mr-2" />
                 Export Results
-              </Button>
+              </Button> */}
               <Button className="bg-sns-orange hover:bg-sns-orange-dark text-white" onClick={onRunAnotherModel}>
                 Run Another Model
               </Button>
