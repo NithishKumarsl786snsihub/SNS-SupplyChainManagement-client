@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import axios from 'axios'
 import { Download, FileText, CheckCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -56,37 +57,66 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
     setTimeout(() => setIsDownloaded(false), 2000)
   }
 
-  const callDummyUploadEndpoint = async (file: File) => {
+  type UploadMeta = { columnsCount: number; rowsCount: number; hasRequired: boolean }
+
+  const uploadFileToBackend = async (file: File): Promise<{ meta: UploadMeta; datasetInfo: any; trainingResult: any; analyzeResult: any }> => {
     const formData = new FormData()
-    formData.append("file", file)
-    formData.append("model", "lightgbm")
-    try { 
-      await fetch("/api/dummy-upload/lightgbm", { method: "POST", body: formData }) 
-    } catch {}
+    formData.append('csv_file', file)
+
+    const res = await axios.post('http://localhost:8000/api/m2/upload-train/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+
+    const datasetInfo = res.data.dataset_info
+    const trainingResult = res.data.training_result
+
+    // Run one-shot analysis for metrics/forecasts/pricing
+    const resAnalyze = await axios.post('http://localhost:8000/api/m2/analyze/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    const analyzeResult = resAnalyze.data
+
+    const text = await file.text()
+    const lines = text.trim().split(/\r?\n/)
+    const headers = lines[0]?.split(',') ?? []
+    const hasRequired = ['date','category','sku','units_sold','price_unit'].every(h => headers.includes(h))
+    const rowsCount = Math.max(lines.length - 1, 0)
+    return { meta: { columnsCount: headers.length, rowsCount, hasRequired }, datasetInfo, trainingResult, analyzeResult }
   }
 
   const startProcessing = async (file: File) => {
     setIsUploading(true)
     setUploadError(null)
     setUploadSteps((s) => s.map((st) => (st.id === "upload" ? { ...st, status: "processing", message: "Uploading file..." } : st)))
-    await callDummyUploadEndpoint(file)
-    await new Promise((r) => setTimeout(r, 700))
-    setUploadSteps((s) => s.map((st) => (st.id === "upload" ? { ...st, status: "completed", message: "File uploaded" } : st)))
+    try {
+      const { meta, datasetInfo, trainingResult, analyzeResult } = await uploadFileToBackend(file)
+      setUploadSteps((s) => s.map((st) => (st.id === "upload" ? { ...st, status: "completed", message: "File uploaded" } : st)))
 
-    setUploadSteps((s) => s.map((st) => (st.id === "validate" ? { ...st, status: "processing", message: "Validating file format..." } : st)))
-    await new Promise((r) => setTimeout(r, 800))
-    setUploadSteps((s) => s.map((st) => (st.id === "validate" ? { ...st, status: "completed", message: "Validation passed" } : st)))
+      setUploadSteps((s) => s.map((st) => (st.id === "validate" ? { ...st, status: "processing", message: "Validating file format..." } : st)))
+      await new Promise((r) => setTimeout(r, 400))
+      setUploadSteps((s) => s.map((st) => (st.id === "validate" ? { ...st, status: meta.hasRequired ? "completed" : "error", message: meta.hasRequired ? "Validation passed" : "Missing required columns: date, category, sku, units_sold, price_unit" } : st)))
 
-    setUploadSteps((s) => s.map((st) => (st.id === "parse" ? { ...st, status: "processing", message: "Analyzing columns..." } : st)))
-    await new Promise((r) => setTimeout(r, 900))
-    setUploadSteps((s) => s.map((st) => (st.id === "parse" ? { ...st, status: "completed", message: "4 columns detected" } : st)))
+      setUploadSteps((s) => s.map((st) => (st.id === "parse" ? { ...st, status: "processing", message: "Analyzing columns..." } : st)))
+      await new Promise((r) => setTimeout(r, 400))
+      setUploadSteps((s) => s.map((st) => (st.id === "parse" ? { ...st, status: "completed", message: `${meta.columnsCount} columns detected` } : st)))
 
-    setUploadSteps((s) => s.map((st) => (st.id === "ready" ? { ...st, status: "processing", message: "Preparing results..." } : st)))
-    await new Promise((r) => setTimeout(r, 1200))
-    setUploadSteps((s) => s.map((st) => (st.id === "ready" ? { ...st, status: "completed", message: "Ready" } : st)))
+      // Persist to session for results page
+      try {
+        sessionStorage.setItem('m2_lightgbm_dataset_info', JSON.stringify(datasetInfo))
+        sessionStorage.setItem('m2_lightgbm_training_result', JSON.stringify(trainingResult))
+        sessionStorage.setItem('m2_lightgbm_analyze_result', JSON.stringify(analyzeResult))
+      } catch {}
 
-    setIsUploading(false)
-    onProcessingComplete()
+      setUploadSteps((s) => s.map((st) => (st.id === "ready" ? { ...st, status: "processing", message: "Preparing results..." } : st)))
+      await new Promise((r) => setTimeout(r, 400))
+      setUploadSteps((s) => s.map((st) => (st.id === "ready" ? { ...st, status: "completed", message: "Ready" } : st)))
+      onProcessingComplete()
+    } catch (e) {
+      setUploadError('Upload failed')
+      setUploadSteps((s) => s.map((st) => (st.id === "upload" ? { ...st, status: "error", message: "Upload failed" } : st)))
+    } finally {
+      setIsUploading(false)
+    }
   }
 
   const handleFileUpload = (file: File) => { 
