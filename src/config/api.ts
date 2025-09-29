@@ -51,6 +51,8 @@ export interface FuturePredictItem {
   month?: number
   date?: string
   predicted_demand: number
+  confidence_upper?: number
+  confidence_lower?: number
 }
 
 export interface FuturePredictResponse {
@@ -67,6 +69,18 @@ export interface PricingSimulation {
   revenue: number
 }
 
+export interface PricingTimeSeriesItem {
+  date: string
+  current_price: number
+  optimal_price: number
+  upper_bound_price: number
+  lower_bound_price: number
+  current_demand: number
+  optimal_demand: number
+  upper_bound_demand: number
+  lower_bound_demand: number
+}
+
 export interface PricingResponse {
   success: boolean
   optimal_price?: number
@@ -76,6 +90,15 @@ export interface PricingResponse {
   elasticity?: number
   simulations?: PricingSimulation[]
   regression_type?: string
+  // New bounds properties for price optimization
+  lower_bound_price?: number
+  upper_bound_price?: number
+  lower_bound_demand?: number
+  upper_bound_demand?: number
+  optimal_demand?: number
+  cost_per_unit?: number
+  // Time series data for charts
+  time_series_data?: PricingTimeSeriesItem[]
   error?: string
 }
 
@@ -257,13 +280,21 @@ export const uploadDatasetM6 = async (file: File): Promise<DatasetUploadResponse
 export const optimizePricingLinear = async (
   datasetId: number,
   priceColumn: string = 'price',
-  demandColumn: string = 'demand'
+  demandColumn: string = 'demand',
+  futureDates?: string[],
+  futureDemands?: number[]
 ): Promise<PricingResponse> => {
   try {
     const response = await fetch(`${API_BASE_URL}/optimize-pricing-linear/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dataset_id: datasetId, price_column: priceColumn, demand_column: demandColumn })
+      body: JSON.stringify({ 
+        dataset_id: datasetId, 
+        price_column: priceColumn, 
+        demand_column: demandColumn,
+        future_dates: futureDates,
+        future_demands: futureDemands
+      })
     })
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
@@ -281,13 +312,21 @@ export const optimizePricingLinear = async (
 export const optimizePricingLogLog = async (
   datasetId: number,
   priceColumn: string = 'price',
-  demandColumn: string = 'demand'
+  demandColumn: string = 'demand',
+  futureDates?: string[],
+  futureDemands?: number[]
 ): Promise<PricingResponse> => {
   try {
     const response = await fetch(`${API_BASE_URL_M6}/optimize-pricing-loglog/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dataset_id: datasetId, price_column: priceColumn, demand_column: demandColumn })
+      body: JSON.stringify({ 
+        dataset_id: datasetId, 
+        price_column: priceColumn, 
+        demand_column: demandColumn,
+        future_dates: futureDates,
+        future_demands: futureDemands
+      })
     })
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
