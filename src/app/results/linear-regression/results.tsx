@@ -312,23 +312,7 @@ export default function Results({ onRunAnotherModel, trainingResult, predictionR
                 <span className="text-sm text-gray-600">
                   {futureFile ? futureFile.name : 'No file selected'}
                 </span>
-                <button
-                  type="button"
-                  onClick={handleDownloadFutureSample}
-                  className="px-3 py-2 text-sm rounded-md bg-gray-100 text-gray-800 hover:bg-gray-200 border"
-                  title="Download sample future-features CSV"
-                >
-                  Download Sample
-                </button>
-                <button
-                  type="button"
-                  onClick={handleUseFutureSample}
-                  className="px-3 py-2 text-sm rounded-md bg-green-600 text-white hover:bg-green-700"
-                  disabled={isPredicting || !datasetId}
-                  title="Use sample future-features and run prediction"
-                >
-                  Use Sample
-                </button>
+               
                 <select
                   value={futureDateColumn}
                   onChange={(e) => setFutureDateColumn(e.target.value)}
@@ -345,28 +329,47 @@ export default function Results({ onRunAnotherModel, trainingResult, predictionR
                   )}
                 </select>
               </div>
-              <Button
-                onClick={async () => {
-                  if (!futureFile) return
-                  // Use datasetId threaded from upload/page; fallback to any id on trainingResult
-                  try {
-                    setIsPredicting(true)
-                    const dsId = datasetId ?? (trainingResult as any)?.dataset_id ?? (trainingResult as any)?.id
-                    if (!dsId) throw new Error('Missing dataset id. Please re-upload and train again.')
-                    const resp = await predictFromFutureFile(Number(dsId), futureFile, 'demand', futureDateColumn)
-                    setFutureResults(resp)
-                  } catch (e) {
-                    console.error('Future predict failed', e)
-                    alert(e instanceof Error ? e.message : 'Prediction failed')
-                  } finally {
-                    setIsPredicting(false)
-                  }
-                }}
-                disabled={isPredicting || !futureFile}
-                className="bg-sns-orange hover:bg-sns-orange-dark text-white"
-              >
-                {isPredicting ? 'Predicting...' : 'Predict from File'}
-              </Button>
+              <div className="flex items-center gap-2">
+                <button
+                    type="button"
+                    onClick={handleDownloadFutureSample}
+                    className="px-3 py-2 text-sm rounded-md bg-gray-100 text-gray-800 hover:bg-gray-200 border"
+                    title="Download sample future-features CSV"
+                  >
+                    Download Sample
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleUseFutureSample}
+                    className="px-3 py-2 text-sm rounded-md bg-green-600 text-white hover:bg-green-700"
+                    disabled={isPredicting || !datasetId}
+                    title="Use sample future-features and run prediction"
+                  >
+                    Use Sample
+                  </button>
+                <Button
+                  onClick={async () => {
+                    if (!futureFile) return
+                    // Use datasetId threaded from upload/page; fallback to any id on trainingResult
+                    try {
+                      setIsPredicting(true)
+                      const dsId = datasetId ?? (trainingResult as any)?.dataset_id ?? (trainingResult as any)?.id
+                      if (!dsId) throw new Error('Missing dataset id. Please re-upload and train again.')
+                      const resp = await predictFromFutureFile(Number(dsId), futureFile, 'demand', futureDateColumn)
+                      setFutureResults(resp)
+                    } catch (e) {
+                      console.error('Future predict failed', e)
+                      alert(e instanceof Error ? e.message : 'Prediction failed')
+                    } finally {
+                      setIsPredicting(false)
+                    }
+                  }}
+                  disabled={isPredicting || !futureFile}
+                  className="bg-sns-orange hover:bg-sns-orange-dark text-white"
+                >
+                  {isPredicting ? 'Predicting...' : 'Predict from File'}
+                </Button>
+              </div>
             </div>
 
             {futureResults && (
