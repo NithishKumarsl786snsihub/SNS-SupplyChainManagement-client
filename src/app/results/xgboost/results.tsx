@@ -53,8 +53,33 @@ export default function Results({ onRunAnotherModel, predictions, categoryMap, c
   const [selectedMonth, setSelectedMonth] = useState<string>("")
   const [gridPoints, setGridPoints] = useState<number>(41)
   const [sweepPct, setSweepPct] = useState<number>(0.30)
-  const [priceCurve, setPriceCurve] = useState<Array<{ price: number; predicted_demand: number; revenue: number }>>([])
-  const [optimalPoint, setOptimalPoint] = useState<{ price: number; predicted_demand: number; revenue: number } | null>(null)
+  const [priceCurve, setPriceCurve] = useState<Array<{ price: number; predicted_demand: number; revenue: number; profit: number; profit_margin: number }>>([])
+  const [optimalPoint, setOptimalPoint] = useState<{ price: number; predicted_demand: number; revenue: number; profit: number; profit_margin: number } | null>(null)
+  const [priceTimeSeries, setPriceTimeSeries] = useState<Array<{
+    month: string;
+    current_price: number;
+    upper_bound: number;
+    lower_bound: number;
+    optimal_price: number;
+  }>>([])
+  const [pricingMetrics, setPricingMetrics] = useState<{
+    marginal_cost: number;
+    elasticity: number;
+    price_sensitivity: number;
+    sensitivity_category: string;
+    strategy: {
+      strategy: string;
+      reason: string;
+      approach: string;
+      elasticity_category: string;
+      margin_category: string;
+    };
+    optimization_metric: string;
+    total_revenue: number;
+    total_profit: number;
+    avg_profit_margin: number;
+    cost_ratio: number;
+  } | null>(null)
   const [priceLoading, setPriceLoading] = useState<boolean>(false)
   const [priceError, setPriceError] = useState<string>("")
 
@@ -146,8 +171,56 @@ export default function Results({ onRunAnotherModel, predictions, categoryMap, c
   useEffect(() => {
     setPriceCurve([])
     setOptimalPoint(null)
+    setPricingMetrics(null)
+    setPriceTimeSeries([])
     setPriceError("")
   }, [selectedStore, selectedProduct])
+
+  // Load price time series data
+  const loadPriceTimeSeries = async () => {
+    if (!selectedStore || !selectedProduct || !contextMap) return
+    
+    try {
+      // Collect context data for all months
+      const contextData = []
+      for (const [key, context] of Object.entries(contextMap)) {
+        if (key.startsWith(`${selectedStore}::${selectedProduct}::`)) {
+          contextData.push(context)
+        }
+      }
+      
+      if (contextData.length === 0) return
+      
+      const payload = {
+        StoreID: selectedStore,
+        ProductID: selectedProduct,
+        context_data: contextData
+      }
+      
+      const resp = await fetch("http://127.0.0.1:8000/api/m1/price-time-series/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+      
+      if (!resp.ok) {
+        console.error("Failed to load price time series")
+        return
+      }
+      
+      const data = await resp.json()
+      setPriceTimeSeries(data.time_series || [])
+    } catch (error) {
+      console.error("Error loading price time series:", error)
+    }
+  }
+
+  // Load price time series when store/product changes
+  useEffect(() => {
+    if (selectedStore && selectedProduct && contextMap) {
+      void loadPriceTimeSeries()
+    }
+  }, [selectedStore, selectedProduct, contextMap])
 
   // Auto-run optimizer when all selections ready and no curve loaded
   useEffect(() => {
@@ -191,10 +264,29 @@ export default function Results({ onRunAnotherModel, predictions, categoryMap, c
       const data = await resp.json()
       setPriceCurve(Array.isArray(data.curve) ? data.curve : [])
       setOptimalPoint(data.optimal || null)
+      setPricingMetrics({
+        marginal_cost: data.marginal_cost || 0,
+        elasticity: data.elasticity || 0,
+        price_sensitivity: data.price_sensitivity || 0,
+        sensitivity_category: data.sensitivity_category || 'Unknown',
+        strategy: data.strategy || {
+          strategy: 'Unknown',
+          reason: 'No strategy determined',
+          approach: 'Standard optimization',
+          elasticity_category: 'Unknown',
+          margin_category: 'Unknown'
+        },
+        optimization_metric: data.optimization_metric || 'revenue',
+        total_revenue: data.total_revenue || 0,
+        total_profit: data.total_profit || 0,
+        avg_profit_margin: data.avg_profit_margin || 0,
+        cost_ratio: data.cost_ratio || 0
+      })
     } catch (e: unknown) {
       setPriceError(e instanceof Error ? e.message : "Failed to run price optimizer")
       setPriceCurve([])
       setOptimalPoint(null)
+      setPricingMetrics(null)
     } finally {
       setPriceLoading(false)
     }
@@ -286,101 +378,86 @@ export default function Results({ onRunAnotherModel, predictions, categoryMap, c
           <ForecastChart data={chartData} title={"Demand Forecast - Predicted Only"} />
         </div>
 
-        {/* Price Analysis */}
-        <div className="mt-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-3">Price Analysis</h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Month</label>
-              <Select value={selectedMonth} onValueChange={(v) => setSelectedMonth(v)} disabled={!selectedStore || !selectedProduct || monthOptions.length === 0}>
-                <SelectTrigger className="w-full bg-white/60 backdrop-blur-md border border-white/40 rounded-xl shadow-[0_8px_24px_rgba(0,0,0,0.06)]">
-                  <SelectValue placeholder={monthOptions.length ? "Select month" : "No months available"} />
-                </SelectTrigger>
-                <SelectContent className="bg-white/80 backdrop-blur-md border border-white/40 rounded-xl max-h-64">
-                  {monthOptions.map((m) => (
-                    <SelectItem key={m} value={m}>{m}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Grid Points</label>
-              <input type="number" min={5} max={201} step={1} value={gridPoints} onChange={(e) => setGridPoints(Number(e.target.value))} className="w-full px-3 py-2 rounded-xl border bg-white/60 backdrop-blur-md border-white/40 shadow-[0_8px_24px_rgba(0,0,0,0.06)] focus:outline-none" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Sweep %</label>
-              <input type="number" min={0.05} max={0.9} step={0.01} value={sweepPct} onChange={(e) => setSweepPct(Number(e.target.value))} className="w-full px-3 py-2 rounded-xl border bg-white/60 backdrop-blur-md border-white/40 shadow-[0_8px_24px_rgba(0,0,0,0.06)] focus:outline-none" />
-            </div>
-            <div className="flex items-end">
-              <Button className="bg-sns-orange hover:bg-sns-orange-dark text-white w-full" disabled={!selectedStore || !selectedProduct || !selectedMonth || priceLoading} onClick={handleRunPriceOptimizer}>
-                {priceLoading ? "Optimizing..." : "Run Price Optimizer"}
-              </Button>
-            </div>
-          </div>
-
-          {priceError && (
-            <div className="text-sm text-red-600 mb-3">{priceError}</div>
-          )}
-
-          {priceCurve.length > 0 && (
+        {/* Price Time Series Chart */}
+        {priceTimeSeries.length > 0 && (
+          <div className="mb-8">
             <div className="rounded-xl p-4 bg-white/60 backdrop-blur-md border border-white/40 shadow-[0_8px_24px_rgba(0,0,0,0.06)]">
-              <h3 className="text-sm font-medium text-gray-800 mb-3">Revenue vs Price</h3>
-              {
-                /* Compute dynamic domains for revenue and demand with padding */
-              }
-              {(() => {
-                const revVals = priceCurve.map((p) => p.revenue)
-                const demVals = priceCurve.map((p) => p.predicted_demand)
-                const revMin = Math.min(...revVals)
-                const revMax = Math.max(...revVals)
-                const demMin = Math.min(...demVals)
-                const demMax = Math.max(...demVals)
-                const revRange = Math.max(1, revMax - revMin)
-                const demRange = Math.max(1, demMax - demMin)
-                const revPad = Math.max(10, Math.round(revRange * 0.1))
-                const demPad = Math.max(1, Math.round(demRange * 0.1))
-                const compact = (n: number) => new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(n)
-                return (
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Price Analysis Over Time</h3>
               <div className="w-full h-80">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={priceCurve} margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>
+                  <LineChart data={priceTimeSeries} margin={{ top: 10, right: 20, left: 20, bottom: 10 }}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="price" tickFormatter={(v) => `${Number(v).toFixed(0)}`} />
-                    <YAxis yAxisId="left" domain={[revMin - revPad, revMax + revPad]} tickFormatter={(v) => compact(Number(v))} />
-                    <YAxis yAxisId="right" domain={[demMin - demPad, demMax + demPad]} orientation="right" tickFormatter={(v) => compact(Number(v))} />
-                    <Tooltip formatter={(value: any, name: any) => [compact(Number(value)), name]} labelFormatter={(label) => `Price: ${Number(label).toFixed(2)}`} />
-                    <Line yAxisId="left" type="monotone" dataKey="revenue" name="Revenue" stroke="#D96F32" strokeWidth={2} dot={{ r: 2 }} connectNulls />
-                    <Line yAxisId="right" type="monotone" dataKey="predicted_demand" name="Predicted Demand" stroke="#2563eb" strokeWidth={2} dot={{ r: 0 }} connectNulls />
-                    {optimalPoint && (
-                      <ReferenceDot x={optimalPoint.price} y={optimalPoint.revenue} yAxisId="left" r={5} fill="#10b981" stroke="#065f46" label={{ value: "Optimal", position: "top", fill: "#065f46" }} />
-                    )}
+                    <XAxis 
+                      dataKey="month" 
+                      tickFormatter={(v) => new Date(v + '-01').toLocaleDateString('en-US', { month: 'short', year: '2-digit' })}
+                    />
+                    <YAxis tickFormatter={(v) => `₹${Number(v).toFixed(0)}`} />
+                    <Tooltip 
+                      formatter={(value: any, name: any) => [`₹${Number(value).toFixed(2)}`, name]} 
+                      labelFormatter={(label) => new Date(label + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="current_price" 
+                      name="Current Price" 
+                      stroke="#f59e0b" 
+                      strokeWidth={3} 
+                      dot={{ r: 4 }} 
+                      connectNulls 
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="upper_bound" 
+                      name="Upper Bound" 
+                      stroke="#ef4444" 
+                      strokeWidth={2} 
+                      strokeDasharray="5 5"
+                      dot={{ r: 2 }} 
+                      connectNulls 
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="lower_bound" 
+                      name="Lower Bound" 
+                      stroke="#22c55e" 
+                      strokeWidth={2} 
+                      strokeDasharray="5 5"
+                      dot={{ r: 2 }} 
+                      connectNulls 
+                    />
+                    {/* <Line 
+                      type="monotone" 
+                      dataKey="optimal_price" 
+                      name="Optimal Price" 
+                      stroke="#f59e0b" 
+                      strokeWidth={2} 
+                      dot={{ r: 3 }} 
+                      connectNulls 
+                    /> */}
                   </LineChart>
                 </ResponsiveContainer>
               </div>
-                )
-              })()}
-              {optimalPoint && (
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <MetricCard
-                    title="Optimal Price"
-                    value={`₹ ${optimalPoint.price.toFixed(2)}`}
-                    description="Price that maximizes revenue for the selected month"
-                  />
-                  <MetricCard
-                    title="Predicted Demand"
-                    value={new Intl.NumberFormat("en").format(Number(optimalPoint.predicted_demand.toFixed(2)))}
-                    description="Units expected at the optimal price"
-                  />
-                  <MetricCard
-                    title="Revenue"
-                    value={`₹ ${new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(Number(optimalPoint.revenue.toFixed(2)))}`}
-                    description="Projected monthly revenue at the optimal price"
-                  />
+              <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                  <span>Current Price</span>
                 </div>
-              )}
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                  <span>Upper Bound</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                  <span>Lower Bound</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-amber-500 rounded-full"></div>
+                  <span>Optimal Price</span>
+                </div>
+              </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   )
