@@ -23,15 +23,18 @@ export interface ModelInfo {
 }
 
 export interface PredictionResponse {
-  dates: string[];
-  predictions: number[];
+  dates: string[]
+  predictions: number[]
   confidence_intervals?: {
-    lower: number[];
-    upper: number[];
-  };
-  model_summary?: string;
-  exog_features_used?: string[];
+    lower: number[]
+    upper: number[]
+  }
+  exog_features_used: string[]
+  prediction_type: string
+  future_exog_used?: Record<string, number[]>
+  model_summary: string
 }
+
 
 export interface OptimizationResult {
   price: number;
@@ -40,10 +43,70 @@ export interface OptimizationResult {
   profit: number;
   margin: number;
 }
+export interface ConfidenceIntervals {
+  demand_lower: number;
+  demand_upper: number;
+  profit_lower: number;
+  profit_upper: number;
+}
 
+export interface MonthlyAnalysis {
+  month: number;
+  price: number;
+  predicted_demand: number;
+  revenue: number;
+  profit: number;
+  margin: number;
+  elasticity: number;
+  confidence_intervals?: ConfidenceIntervals;
+}
+
+export interface MonthlyOptimalPrices {
+  month_1: MonthlyAnalysis;
+  month_2: MonthlyAnalysis;
+  month_3: MonthlyAnalysis;
+}
+
+
+export interface ElasticityThresholds {
+  high_elasticity: number | null;
+  low_elasticity: number | null;
+  optimal_range: {
+    min: number | null;
+    max: number | null;
+  };
+}
 export interface PriceOptimizationResponse {
-  optimization_results: OptimizationResult[];
-  best_price?: OptimizationResult;
+  optimization_results: Array<{
+    price: number
+    predicted_demand: number
+    revenue: number
+    profit: number
+    margin: number
+    confidence_intervals?: {
+      demand_lower: number
+      demand_upper: number
+      profit_lower: number
+      profit_upper: number
+    }
+  }>
+  best_price: {
+    price: number
+    predicted_demand: number
+    revenue: number
+    profit: number
+    margin: number
+    confidence_intervals?: {
+      demand_lower: number
+      demand_upper: number
+      profit_lower: number
+      profit_upper: number
+    }
+  } | null
+
+    monthly_optimal_prices: MonthlyOptimalPrices;
+  elasticity_analysis: ElasticityThresholds;
+  best_overall_price: OptimizationResult | null;
 }
 
 export interface ScenarioResponse {
@@ -77,3 +140,4 @@ export interface ModelDatasetInfo {
   arima: DatasetInfo | null;
   arimax: DatasetInfo | null;
 }
+

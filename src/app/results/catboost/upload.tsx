@@ -68,52 +68,145 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
     setTimeout(() => setIsDownloaded(false), 2000)
   }
 
-  const callDummyUploadEndpoint = async (file: File) => {
+  const callCatBoostAPI = async (file: File) => {
+    console.log('🚀 [FRONTEND] Starting CatBoost API call')
+    console.log(`📁 [FRONTEND] File: ${file.name} (${file.size} bytes)`)
+    
     const formData = new FormData()
     formData.append("file", file)
-    formData.append("model", "catboost")
-    try { 
-      await fetch("/api/dummy-upload/catboost", { method: "POST", body: formData }) 
-    } catch {}
+    
+    try {
+      console.log('🌐 [FRONTEND] Sending request to http://localhost:8000/api/m3/')
+      
+      // Create AbortController for timeout handling
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 300000) // 5 minute timeout
+      
+      const response = await fetch("http://localhost:8000/api/m3/", {
+        method: "POST",
+        body: formData,
+        credentials: 'include',
+        signal: controller.signal
+      })
+      
+      clearTimeout(timeoutId)
+      
+      console.log(`📊 [FRONTEND] Response status: ${response.status}`)
+      console.log(`📊 [FRONTEND] Response headers:`, Object.fromEntries(response.headers.entries()))
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error(`❌ [FRONTEND] HTTP error: ${response.status}`)
+        console.error(`❌ [FRONTEND] Error details: ${errorText}`)
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`)
+      }
+      
+      console.log('📖 [FRONTEND] Parsing JSON response...')
+      const result = await response.json()
+      console.log('✅ [FRONTEND] API call successful')
+      console.log(`📊 [FRONTEND] Response data:`, {
+        count: result.count,
+        model: result.model,
+        status: result.status,
+        predictionsCount: result.predictions?.length || 0,
+        dataInfo: result.data_info
+      })
+      
+      // Log data validation info if available
+      if (result.data_info) {
+        console.log(`📊 [FRONTEND] Data processing info:`, {
+          totalRows: result.data_info.total_rows_processed,
+          predictionsGenerated: result.data_info.predictions_generated,
+          processingTime: result.data_info.processing_time_seconds,
+          targetVariableHandled: result.data_info.target_variable_handled
+        })
+      }
+      
+      return result
+    } catch (error) {
+      console.error('❌ [FRONTEND] Error calling CatBoost API:', error)
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('Request timed out. The file is too large or the server is taking too long to process.')
+      }
+      throw error
+    }
   }
 
   const startProcessing = async (file: File) => {
+    console.log('🚀 [FRONTEND] Starting file processing')
+    console.log(`📁 [FRONTEND] Processing file: ${file.name}`)
+    
+    // Check file size and warn user
+    const fileSizeMB = file.size / (1024 * 1024)
+    if (fileSizeMB > 50) {
+      console.warn(`⚠️ [FRONTEND] Large file detected: ${fileSizeMB.toFixed(2)}MB. Processing may take several minutes.`)
+    }
+    
     setIsUploading(true)
     setUploadError(null)
-    setUploadSteps((s) => s.map((st) => (st.id === "upload" ? { ...st, status: "processing", message: "Uploading file..." } : st)))
-    await callDummyUploadEndpoint(file)
-    await new Promise((r) => setTimeout(r, 700))
-    setUploadSteps((s) => s.map((st) => (st.id === "upload" ? { ...st, status: "completed", message: "File uploaded" } : st)))
+    setUploadSteps((s) => s.map((st) => (st.id === "upload" ? { ...st, status: "processing", message: `Uploading file (${fileSizeMB.toFixed(1)}MB)...` } : st)))
+    
+    try {
+      console.log('🌐 [FRONTEND] Calling CatBoost API...')
+      // Call the real CatBoost API
+      const result = await callCatBoostAPI(file)
+      console.log('✅ [FRONTEND] API call completed successfully')
+      
+      setUploadSteps((s) => s.map((st) => (st.id === "upload" ? { ...st, status: "completed", message: "File uploaded" } : st)))
 
-    setUploadSteps((s) => s.map((st) => (st.id === "validate" ? { ...st, status: "processing", message: "Validating file format..." } : st)))
-    await new Promise((r) => setTimeout(r, 800))
-    setUploadSteps((s) => s.map((st) => (st.id === "validate" ? { ...st, status: "completed", message: "Validation passed" } : st)))
+      console.log('🔍 [FRONTEND] Starting validation step...')
+      setUploadSteps((s) => s.map((st) => (st.id === "validate" ? { ...st, status: "processing", message: "Validating file format and columns..." } : st)))
+      await new Promise((r) => setTimeout(r, 500))
+      
+      // Check if DailySalesQty was handled (target variable)
+      const validationMessage = result.data_info?.target_variable_handled 
+        ? "Validation passed (DailySalesQty column detected and handled)" 
+        : "Validation passed"
+      
+      setUploadSteps((s) => s.map((st) => (st.id === "validate" ? { ...st, status: "completed", message: validationMessage } : st)))
 
-    setUploadSteps((s) => s.map((st) => (st.id === "parse" ? { ...st, status: "processing", message: "Analyzing columns..." } : st)))
-    await new Promise((r) => setTimeout(r, 900))
-    const mockPreviewData = [
-      { date: "2024-01-01", demand: 1250, price: 29.99, inventory_level: 5000 },
-      { date: "2024-01-02", demand: 1180, price: 29.99, inventory_level: 4850 },
-      { date: "2024-01-03", demand: 1320, price: 27.99, inventory_level: 4700 },
-    ]
-    const columns = Object.keys(mockPreviewData[0])
-    setFilePreview({ 
-      fileName: file.name, 
-      fileSize: file.size, 
-      rowCount: 1000, 
-      columnCount: columns.length, 
-      columns, 
-      previewData: mockPreviewData as Array<Record<string, unknown>>, 
-      validationErrors: [] 
-    })
-    setUploadSteps((s) => s.map((st) => (st.id === "parse" ? { ...st, status: "completed", message: `${columns.length} columns detected` } : st)))
+      console.log('📊 [FRONTEND] Starting column analysis...')
+      setUploadSteps((s) => s.map((st) => (st.id === "parse" ? { ...st, status: "processing", message: "Analyzing columns..." } : st)))
+      await new Promise((r) => setTimeout(r, 500))
+      
+      // Use actual prediction results for preview
+      const previewData = result.predictions?.slice(0, 5) || []
+      const columns = previewData.length > 0 ? Object.keys(previewData[0]) : ['Date', 'StoreID', 'ProductID', 'PredictedDailySales', 'Confidence']
+      
+      console.log(`📊 [FRONTEND] Preview data: ${previewData.length} rows, ${columns.length} columns`)
+      console.log(`📊 [FRONTEND] Columns: ${columns.join(', ')}`)
+      
+      setFilePreview({ 
+        fileName: file.name, 
+        fileSize: file.size, 
+        rowCount: result.count || 0, 
+        columnCount: columns.length, 
+        columns, 
+        previewData: previewData as Array<Record<string, unknown>>, 
+        validationErrors: [] 
+      })
+      setUploadSteps((s) => s.map((st) => (st.id === "parse" ? { ...st, status: "completed", message: `${columns.length} columns detected` } : st)))
 
-    setUploadSteps((s) => s.map((st) => (st.id === "ready" ? { ...st, status: "processing", message: "Preparing results..." } : st)))
-    await new Promise((r) => setTimeout(r, 1200))
-    setUploadSteps((s) => s.map((st) => (st.id === "ready" ? { ...st, status: "completed", message: "Ready" } : st)))
+      console.log('🎯 [FRONTEND] Preparing final results...')
+      setUploadSteps((s) => s.map((st) => (st.id === "ready" ? { ...st, status: "processing", message: "Preparing results..." } : st)))
+      await new Promise((r) => setTimeout(r, 500))
+      setUploadSteps((s) => s.map((st) => (st.id === "ready" ? { ...st, status: "completed", message: "Ready" } : st)))
 
-    setIsUploading(false)
-    onProcessingComplete()
+      // Store the results for the results component
+      console.log('💾 [FRONTEND] Storing results in session storage...')
+      sessionStorage.setItem('catboost_results', JSON.stringify(result))
+      console.log('✅ [FRONTEND] Results stored successfully')
+      
+      setIsUploading(false)
+      console.log('🎉 [FRONTEND] Processing completed successfully')
+      onProcessingComplete()
+      
+    } catch (error) {
+      console.error('❌ [FRONTEND] Processing error:', error)
+      setUploadError(`Processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      setUploadSteps((s) => s.map((st) => ({ ...st, status: "error" as const, message: "Processing failed" })))
+      setIsUploading(false)
+    }
   }
 
   const handleFileUpload = (file: File) => { 
@@ -206,7 +299,11 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
         <UploadProgress steps={uploadSteps} />
       </div>
 
-      {uploadedFile && isUploading && <LoaderSpinner message="Processing your data..." />}
+      {uploadedFile && isUploading && (
+        <LoaderSpinner 
+          message={`Processing your data... ${uploadedFile.size > 50 * 1024 * 1024 ? 'Large file detected - this may take several minutes.' : ''}`} 
+        />
+      )}
     </>
   )
 }
