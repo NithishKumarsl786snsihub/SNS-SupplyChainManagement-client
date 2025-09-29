@@ -1,6 +1,7 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { CheckCircle, Clock, AlertCircle } from "lucide-react"
 
 interface UploadStep {
@@ -12,9 +13,11 @@ interface UploadStep {
 
 interface UploadProgressProps {
   steps: UploadStep[]
+  onStart?: () => void
+  canStart?: boolean
 }
 
-export function UploadProgress({ steps }: UploadProgressProps) {
+export function UploadProgress({ steps, onStart, canStart }: UploadProgressProps) {
   const getStepIcon = (status: UploadStep["status"]) => {
     switch (status) {
       case "completed":
@@ -56,6 +59,13 @@ export function UploadProgress({ steps }: UploadProgressProps) {
             </div>
           </div>
         ))}
+        {onStart && (
+          <div className="pt-2 flex items-center justify-end">
+            <Button className="bg-[#D96F32] hover:bg-[#C75D2C] text-white" onClick={onStart} disabled={!canStart}>
+              Start Prediction
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   )

@@ -1,67 +1,70 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { Download, TrendingUp, BarChart3, Shield, Layers } from "lucide-react"
+import { Download, BarChart3, Shield, Layers } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { MetricCard } from "@/components/metric-card"
-import { ForecastChart } from "@/components/charts/forecast-chart"
-import { FeatureImportanceChart } from "@/components/charts/feature-importance-chart"
-import { ModelParameters } from "@/components/model-parameters"
+import DemandForecastChart from "@/components/charts/demand-forecast-chart"
+import ProductSelector from "@/components/product-selector"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useEffect, useState } from "react"
 
-const forecastData = Array.from({ length: 30 }).map((_, i) => {
-  const base = 1000 + i * 8
-  return {
-    date: new Date(2024, 0, i + 1).toISOString().slice(0, 10),
-    actual: i < 20 ? base + (i % 3 === 0 ? 40 : -20) : undefined,
-    predicted: base + 10,
-    confidence_upper: base + 80,
-    confidence_lower: base - 80,
-  }
-})
-
-const importanceData = [
-  { feature: "price", importance: 0.32 },
-  { feature: "inventory_level", importance: 0.24 },
-  { feature: "seasonal_factor", importance: 0.21 },
-  { feature: "promotional", importance: 0.14 },
-  { feature: "date", importance: 0.09 },
-]
-
-const parameters = [
-  { name: "Iterations", value: "1000" },
-  { name: "Learning Rate", value: "0.08" },
-  { name: "Depth", value: "6" },
-  { name: "L2 Regularization", value: "3.0" },
-  { name: "Border Count", value: "128" },
-  { name: "Cat Features", value: "Auto-detected" },
-]
-
-const categoricalFeatures = [
-  { feature: "Product Category", handling: "Target Encoding", impact: "High" },
-  { feature: "Supplier Region", handling: "Frequency Encoding", impact: "Medium" },
-  { feature: "Season", handling: "One-Hot Encoding", impact: "High" },
-  { feature: "Promotion Type", handling: "Target Encoding", impact: "Medium" },
-]
-
-const metrics = [
-  { title: "Accuracy Score", value: "95.1%", change: 2.8, changeType: "increase" as const, icon: <TrendingUp className="h-4 w-4" /> },
-  { title: "MAPE", value: "4.9%", change: 0.6, changeType: "decrease" as const, icon: <BarChart3 className="h-4 w-4" /> },
-  { title: "RMSE", value: 11.2, change: 1.8, changeType: "decrease" as const, icon: <BarChart3 className="h-4 w-4" /> },
-  { title: "Overfitting Score", value: "Low", icon: <Shield className="h-4 w-4" /> },
-]
 
 interface ResultsProps {
   onRunAnotherModel: () => void
 }
 
+interface PredictionResult {
+  StoreID: string
+  ProductID: string
+  Date: string
+  PredictedDailySales: number
+  Confidence: number
+  Error?: string
+}
+
+interface CatBoostResults {
+  count: number
+  predictions: PredictionResult[]
+  model: string
+  status: string
+  data_info?: {
+    total_rows_processed: number
+    predictions_generated: number
+    processing_time_seconds: number
+    target_variable_handled: boolean
+  }
+}
+
 export default function Results({ onRunAnotherModel }: ResultsProps) {
+  const [results, setResults] = useState<CatBoostResults | null>(null)
+
   const breadcrumbItems = [
     { label: "Home", href: "/" },
     { label: "Models", href: "/models" },
     { label: "CatBoost", current: true },
   ]
+
+  useEffect(() => {
+    // Load results from session storage
+    const storedResults = sessionStorage.getItem('catboost_results')
+    if (storedResults) {
+      try {
+        const parsedResults = JSON.parse(storedResults)
+        setResults(parsedResults)
+        
+        // Results loaded successfully
+        
+      } catch (error) {
+        console.error('Error parsing stored results:', error)
+      }
+    }
+  }, [])
+
+  const handleSelectionChange = (store: string, product: string, filteredData: PredictionResult[]) => {
+    // Selection change is handled by the ProductSelector component
+    console.log(`Selected: ${store} - ${product} (${filteredData.length} data points)`)
+  }
 
   return (
     <div className="min-h-screen bg-sns-cream/20">
@@ -87,87 +90,127 @@ export default function Results({ onRunAnotherModel }: ResultsProps) {
           </div>
         </motion.div>
 
-        {/* Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {metrics.map((metric) => (
-            <MetricCard key={metric.title} {...metric} />
-          ))}
-        </div>
 
-        {/* Main Visualization */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-          <div className="lg:col-span-2">
-            <ForecastChart data={forecastData} title="Demand Forecast vs Actual" />
-          </div>
-          <div>
-            <FeatureImportanceChart data={importanceData} title="Feature Importance Analysis" />
-          </div>
-        </div>
+        {/* Interactive CatBoost Visualization */}
+        {results && results.predictions && results.predictions.length > 0 ? (
+          <>
+            {/* Product Selection */}
+            <div className="mb-8">
+              <ProductSelector 
+                data={results.predictions} 
+                onSelectionChange={handleSelectionChange}
+              />
+            </div>
 
-        {/* Categorical Features & Overfitting Detection */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Layers className="w-5 h-5 text-sns-orange" />
-                Categorical Feature Handling
-              </CardTitle>
-              <CardDescription>Automatic encoding and processing summary</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {categoricalFeatures.map((item, index) => (
-                  <motion.div key={item.feature} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: index * 0.1 }} className="flex justify-between items-center p-3 bg-sns-cream/30 rounded-lg">
-                    <div>
-                      <p className="font-medium text-gray-900">{item.feature}</p>
-                      <p className="text-sm text-gray-600">{item.handling}</p>
-                    </div>
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${item.impact === "High" ? "bg-sns-orange text-white" : item.impact === "Medium" ? "bg-sns-yellow text-gray-900" : "bg-gray-200 text-gray-700"}`}>
-                      {item.impact}
+            {/* Main Interactive Chart - Full Width */}
+            <div className="mb-8">
+              <DemandForecastChart 
+                data={results.predictions} 
+                title="Interactive Demand Forecast Analysis"
+              />
+            </div>
+          </>
+        ) : (
+          /* No Data State */
+          <div className="mb-8">
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-16">
+                <div className="text-center">
+                  <BarChart3 className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">No Data Available</h3>
+                  <p className="text-gray-600 mb-6">
+                    Upload your data to see interactive demand forecasting and detailed analytics.
+                  </p>
+                  <Button 
+                    onClick={onRunAnotherModel}
+                    className="bg-sns-orange hover:bg-sns-orange-dark text-white"
+                  >
+                    Upload Data
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Real-time Data Summary - Only show when we have data */}
+        {results && results.predictions && results.predictions.length > 0 && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Layers className="w-5 h-5 text-sns-orange" />
+                  Data Processing Summary
+                </CardTitle>
+                <CardDescription>Real-time processing information from your uploaded data</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Data Points Processed</span>
+                    <span className="font-bold text-blue-600">{results.count || 0}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Unique Stores</span>
+                    <span className="font-bold text-green-600">
+                      {results.predictions ? [...new Set(results.predictions.map(p => p.StoreID))].length : 0}
                     </span>
-                  </motion.div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="w-5 h-5 text-sns-orange" />
-                Overfitting Detection
-              </CardTitle>
-              <CardDescription>Model complexity and generalization analysis</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Overfitting Risk</span>
-                  <span className="font-bold text-green-600">Low</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className="bg-green-500 h-2 rounded-full" style={{ width: "25%" }}></div>
-                </div>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="text-gray-600">Train Score</p>
-                    <p className="font-medium">95.1%</p>
                   </div>
-                  <div>
-                    <p className="text-gray-600">Validation Score</p>
-                    <p className="font-medium">94.3%</p>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Unique Products</span>
+                    <span className="font-bold text-purple-600">
+                      {results.predictions ? [...new Set(results.predictions.map(p => p.ProductID))].length : 0}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Processing Time</span>
+                    <span className="font-bold text-orange-600">
+                      {results.data_info?.processing_time_seconds 
+                        ? `${results.data_info.processing_time_seconds.toFixed(1)}s`
+                        : '< 1s'
+                      }
+                    </span>
                   </div>
                 </div>
-                <div className="text-sm text-gray-600">
-                  <p>Model shows excellent generalization with minimal overfitting detected.</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              </CardContent>
+            </Card>
 
-        {/* Model Parameters */}
-        <ModelParameters modelName="CatBoost" parameters={parameters} />
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-sns-orange" />
+                  Model Performance
+                </CardTitle>
+                <CardDescription>CatBoost model performance metrics</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Model Status</span>
+                    <span className="font-bold text-green-600">Active</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Average Confidence</span>
+                    <span className="font-bold text-blue-600">
+                      {results.predictions && results.predictions.length > 0 
+                        ? `${(results.predictions.reduce((sum, p) => sum + p.Confidence, 0) / results.predictions.length * 100).toFixed(1)}%`
+                        : '0%'
+                      }
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Target Variable</span>
+                    <span className="font-bold text-purple-600">DailySalesQty</span>
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    <p>CatBoost model successfully processed your data with high confidence predictions.</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
       </div>
     </div>
   )
