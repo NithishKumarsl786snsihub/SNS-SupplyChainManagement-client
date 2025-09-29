@@ -2,42 +2,39 @@
 
 import { useState } from "react"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
-import { ResultsSidebar } from "@/components/sidebar"
 import Upload from "./upload"
 import Results from "./results"
 
-export default function ProphetResultsPage() {
+export default function ProphetPage() {
+  const [processingDone, setProcessingDone] = useState(false)
+  const [results, setResults] = useState<any>(null)
+
   const breadcrumbItems = [
     { label: "Home", href: "/" },
     { label: "Models", href: "/models" },
     { label: "Prophet", current: true },
   ]
 
-  const [processingDone, setProcessingDone] = useState(false)
-
-  const handleProcessingComplete = () => {
+  const handleProcessingComplete = (apiResults: any) => {
+    setResults(apiResults)
     setProcessingDone(true)
   }
 
   const handleRunAnotherModel = () => {
     setProcessingDone(false)
+    setResults(null)
   }
 
   return (
-    <div className="min-h-screen bg-sns-cream/20">
-      {!processingDone ? (
-        <>
-          <ResultsSidebar />
-          <div className="px-4 sm:px-6 lg:pl-[300px] lg:pr-8 py-8">
-            <BreadcrumbNav items={breadcrumbItems} />
-            <Upload onProcessingComplete={handleProcessingComplete} />
-          </div>
-        </>
-      ) : (
-        <Results onRunAnotherModel={handleRunAnotherModel} />
-      )}
+    <div className="min-h-screen bg-gray-50">
+      <div className="px-4 sm:px-6 lg:px-8 py-8">
+        <BreadcrumbNav items={breadcrumbItems} />
+        {!processingDone ? (
+          <Upload modelName="Prophet" onProcessingComplete={handleProcessingComplete} />
+        ) : (
+          <Results data={results} onRunAnotherModel={handleRunAnotherModel} />
+        )}
+      </div>
     </div>
   )
 }
-
-
