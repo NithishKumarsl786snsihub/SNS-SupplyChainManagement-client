@@ -9,6 +9,8 @@ import { UploadProgress } from "@/components/upload-progress"
 import { FilePreview } from "@/components/file-preview"
 import { DataTable } from "@/components/data-table"
 import LoaderSpinner from "@/components/ui/loader"
+import { Input } from "@/components/ui/input"
+import type { SarimaxResult } from "./page"
 
 interface UploadStep { 
   id: string
@@ -28,7 +30,7 @@ interface FilePreviewState {
 }
 
 interface UploadProps {
-  onProcessingComplete: () => void
+  onProcessingComplete: (payload: SarimaxResult) => void
 }
 
 export default function Upload({ onProcessingComplete }: UploadProps) {
@@ -36,6 +38,7 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
   const [isUploading, setIsUploading] = useState(false)
   const [isDownloaded, setIsDownloaded] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [forecastMonths, setForecastMonths] = useState<number>(6)
   const [uploadSteps, setUploadSteps] = useState<UploadStep[]>([
     { id: "upload", label: "File Upload", status: "pending" },
     { id: "validate", label: "Data Validation", status: "pending" },
@@ -44,11 +47,12 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
   ])
   const [filePreview, setFilePreview] = useState<FilePreviewState | null>(null)
 
-  // Sample dataset used in the Dataset Preview card
   const getSampleData = () => [
-    { Date: "2024-01-01", Demand: 1300, Price: 30, "Inventory Level": 5200, "Seasonal Factor": 1.3, Promotional: 0 },
-    { Date: "2024-01-02", Demand: 1220, Price: 30, "Inventory Level": 5050, "Seasonal Factor": 1.3, Promotional: 0 },
-    { Date: "2024-01-03", Demand: 1380, Price: 28, "Inventory Level": 4900, "Seasonal Factor": 1.3, Promotional: 1 },
+    { Date: "1/1/2024", StoreID: "S001", ProductID: "P001", "Product Name": "T-Shirt Ba: T-Shirt", Category: "T-Shirt", SubCategory: "Basic", City: "Bhubanes", Region: "East", Price: 925, "Discount_Percentage": 12, Promotion: 0, "Competition_Sales": 759, Season: "Winter", "Holiday_Flag": 1, "Holiday_Name": "NewYear", "Ad_Spend": 519, "Unemployment_Rate": 6.013891, Inflation: 5.453265, Temperature: 17.388, Precipitation: 16, "Median_Income": 38921, "Competitor_Count": 15 },
+    { Date: "2/1/2024", StoreID: "S001", ProductID: "P001", "Product Name": "T-Shirt Ba: T-Shirt", Category: "T-Shirt", SubCategory: "Basic", City: "Bhubanes", Region: "East", Price: 1985, "Discount_Percentage": 5, Promotion: 1, "Competition_Sales": 1977, Season: "Spring", "Holiday_Flag": 0, "Holiday_Name": "", "Ad_Spend": 2172, "Unemployment_Rate": 6.228197, Inflation: 5.907183, Temperature: 29.30521, Precipitation: 4, "Median_Income": 39225, "Competitor_Count": 18 },
+    { Date: "3/1/2024", StoreID: "S001", ProductID: "P001", "Product Name": "T-Shirt Ba: T-Shirt", Category: "T-Shirt", SubCategory: "Basic", City: "Bhubanes", Region: "East", Price: 713, "Discount_Percentage": 13, Promotion: 0, "Competition_Sales": 1427, Season: "Spring", "Holiday_Flag": 0, "Holiday_Name": "", "Ad_Spend": 158, "Unemployment_Rate": 6.571115, Inflation: 5.78738, Temperature: 15.7679, Precipitation: 38, "Median_Income": 38965, "Competitor_Count": 8 },
+    { Date: "4/1/2024", StoreID: "S001", ProductID: "P001", "Product Name": "T-Shirt Ba: T-Shirt", Category: "T-Shirt", SubCategory: "Basic", City: "Bhubanes", Region: "East", Price: 1245, "Discount_Percentage": 8, Promotion: 1, "Competition_Sales": 1856, Season: "Spring", "Holiday_Flag": 0, "Holiday_Name": "", "Ad_Spend": 892, "Unemployment_Rate": 6.234567, Inflation: 5.654321, Temperature: 22.4567, Precipitation: 12, "Median_Income": 39150, "Competitor_Count": 12 },
+    { Date: "5/1/2024", StoreID: "S001", ProductID: "P001", "Product Name": "T-Shirt Ba: T-Shirt", Category: "T-Shirt", SubCategory: "Basic", City: "Bhubanes", Region: "East", Price: 1567, "Discount_Percentage": 15, Promotion: 0, "Competition_Sales": 2103, Season: "Summer", "Holiday_Flag": 0, "Holiday_Name": "", "Ad_Spend": 1345, "Unemployment_Rate": 6.123456, Inflation: 5.987654, Temperature: 31.2345, Precipitation: 6, "Median_Income": 39300, "Competitor_Count": 14 }
   ]
 
   const handleDownload = () => {
@@ -59,7 +63,7 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = "catboost_sample_dataset.csv"
+    a.download = "sarimax_sample_dataset.csv"
     document.body.appendChild(a)
     a.click()
     a.remove()
@@ -68,52 +72,124 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
     setTimeout(() => setIsDownloaded(false), 2000)
   }
 
-  const callDummyUploadEndpoint = async (file: File) => {
+  const callSarimaxForecast = async (file: File, steps: number): Promise<SarimaxResult> => {
     const formData = new FormData()
     formData.append("file", file)
-    formData.append("model", "catboost")
-    try { 
-      await fetch("/api/dummy-upload/catboost", { method: "POST", body: formData }) 
-    } catch {}
+    if (Number.isFinite(steps) && steps > 0) {
+      formData.append("steps", String(Math.floor(steps)))
+    }
+    formData.append("group_cols", "StoreID,ProductID")
+    const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000"
+    const resp = await fetch(`${base}/api/sarimax/sarimax-batch-forecast/`, {
+      method: "POST",
+      body: formData,
+    })
+    if (!resp.ok) {
+      let message = "Request failed"
+      try {
+        type ErrorResponse = { error?: unknown }
+        const data: unknown = await resp.json()
+        if (data && typeof data === "object" && "error" in data) {
+          const errVal = (data as ErrorResponse).error
+          if (typeof errVal === "string") {
+            message = errVal
+          }
+        } else {
+          const text = await resp.text()
+          if (text) message = text
+        }
+      } catch {
+        const text = await resp.text().catch(() => "")
+        if (text) message = text
+      }
+      throw new Error(message)
+    }
+    return resp.json()
+  }
+
+  const quickValidateCsvHasDate = async (file: File): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      const text = await file.text()
+      const firstLine = text.split(/\r?\n/)[0] ?? ""
+      if (!firstLine) return { ok: false, error: "Empty file." }
+      const headers = firstLine.split(",").map((h) => h.trim())
+      const hasDate = headers.some((h) => h.toLowerCase() === "date")
+      if (!hasDate) return { ok: false, error: "CSV must contain a 'date' column." }
+      return { ok: true }
+    } catch {
+      return { ok: false, error: "Unable to read the CSV file." }
+    }
   }
 
   const startProcessing = async (file: File) => {
     setIsUploading(true)
     setUploadError(null)
     setUploadSteps((s) => s.map((st) => (st.id === "upload" ? { ...st, status: "processing", message: "Uploading file..." } : st)))
-    await callDummyUploadEndpoint(file)
-    await new Promise((r) => setTimeout(r, 700))
-    setUploadSteps((s) => s.map((st) => (st.id === "upload" ? { ...st, status: "completed", message: "File uploaded" } : st)))
 
-    setUploadSteps((s) => s.map((st) => (st.id === "validate" ? { ...st, status: "processing", message: "Validating file format..." } : st)))
-    await new Promise((r) => setTimeout(r, 800))
-    setUploadSteps((s) => s.map((st) => (st.id === "validate" ? { ...st, status: "completed", message: "Validation passed" } : st)))
+    try {
+      const basicCheck = await quickValidateCsvHasDate(file)
+      if (!basicCheck.ok) {
+        throw new Error(basicCheck.error || "Invalid CSV format.")
+      }
+      const steps = Math.max(1, Math.floor((forecastMonths || 1) * 30))
+      const result = await callSarimaxForecast(file, steps)
+      setUploadSteps((s) => s.map((st) => (st.id === "upload" ? { ...st, status: "completed", message: "File uploaded" } : st)))
 
-    setUploadSteps((s) => s.map((st) => (st.id === "parse" ? { ...st, status: "processing", message: "Analyzing columns..." } : st)))
-    await new Promise((r) => setTimeout(r, 900))
-    const mockPreviewData = [
-      { date: "2024-01-01", demand: 1250, price: 29.99, inventory_level: 5000 },
-      { date: "2024-01-02", demand: 1180, price: 29.99, inventory_level: 4850 },
-      { date: "2024-01-03", demand: 1320, price: 27.99, inventory_level: 4700 },
-    ]
-    const columns = Object.keys(mockPreviewData[0])
-    setFilePreview({ 
-      fileName: file.name, 
-      fileSize: file.size, 
-      rowCount: 1000, 
-      columnCount: columns.length, 
-      columns, 
-      previewData: mockPreviewData as Array<Record<string, unknown>>, 
-      validationErrors: [] 
-    })
-    setUploadSteps((s) => s.map((st) => (st.id === "parse" ? { ...st, status: "completed", message: `${columns.length} columns detected` } : st)))
+      setUploadSteps((s) => s.map((st) => (st.id === "validate" ? { ...st, status: "processing", message: "Validating file format..." } : st)))
+      await new Promise((r) => setTimeout(r, 400))
+      setUploadSteps((s) => s.map((st) => (st.id === "validate" ? { ...st, status: "completed", message: "Validation passed" } : st)))
 
-    setUploadSteps((s) => s.map((st) => (st.id === "ready" ? { ...st, status: "processing", message: "Preparing results..." } : st)))
-    await new Promise((r) => setTimeout(r, 1200))
-    setUploadSteps((s) => s.map((st) => (st.id === "ready" ? { ...st, status: "completed", message: "Ready" } : st)))
+      setUploadSteps((s) => s.map((st) => (st.id === "parse" ? { ...st, status: "processing", message: "Analyzing columns..." } : st)))
+      const previewData = (result?.preview as Array<Record<string, unknown>>) ?? []
+      const columns = previewData.length > 0 ? Object.keys(previewData[0]) : []
+      setFilePreview({ 
+        fileName: file.name, 
+        fileSize: file.size, 
+        rowCount: previewData.length, 
+        columnCount: columns.length, 
+        columns, 
+        previewData, 
+        validationErrors: [] 
+      })
+      setUploadSteps((s) => s.map((st) => (st.id === "parse" ? { ...st, status: "completed", message: `${columns.length} columns detected` } : st)))
 
-    setIsUploading(false)
-    onProcessingComplete()
+      setUploadSteps((s) => s.map((st) => (st.id === "ready" ? { ...st, status: "processing", message: "Preparing results..." } : st)))
+      await new Promise((r) => setTimeout(r, 200))
+      setUploadSteps((s) => s.map((st) => (st.id === "ready" ? { ...st, status: "completed", message: "Ready" } : st)))
+
+      // Build store->products map from the uploaded CSV
+      let storeToProducts: Record<string, string[]> | undefined
+      try {
+        const text = await file.text()
+        const lines = text.split(/\r?\n/).filter((l) => l.trim())
+        if (lines.length > 1) {
+          const header = lines[0].split(",")
+          const storeIdx = header.findIndex((h) => h.trim() === "StoreID")
+          const prodIdx = header.findIndex((h) => h.trim() === "ProductID")
+          if (storeIdx >= 0 && prodIdx >= 0) {
+            const map = new Map<string, Set<string>>()
+            for (let i = 1; i < lines.length; i++) {
+              const parts = lines[i].split(",")
+              if (parts.length < Math.max(storeIdx, prodIdx) + 1) continue
+              const s = parts[storeIdx]?.trim()
+              const p = parts[prodIdx]?.trim()
+              if (!s || !p) continue
+              if (!map.has(s)) map.set(s, new Set<string>())
+              map.get(s)!.add(p)
+            }
+            storeToProducts = Object.fromEntries(Array.from(map.entries()).map(([k, v]) => [k, Array.from(v)]))
+          }
+        }
+      } catch {}
+
+      setIsUploading(false)
+      onProcessingComplete({ ...result, storeToProducts })
+    } catch (err: unknown) {
+      const message = typeof err === "object" && err && "message" in err ? String((err as { message?: unknown }).message) : "Upload failed"
+      setUploadError(message)
+      setIsUploading(false)
+      setUploadSteps((s) => s.map((st) => (st.id === "upload" ? { ...st, status: "error", message } : st)))
+    }
   }
 
   const handleFileUpload = (file: File) => { 
@@ -149,8 +225,8 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
                 <FileText className="h-6 w-6 text-green-600" />
               </div>
               <div>
-                <p className="font-medium text-gray-900">catboost_sample_dataset.csv</p>
-                <p className="text-sm text-gray-600">{getSampleData().length} records • 6 columns • 2.1 KB</p>
+                <p className="font-medium text-gray-900">sarimax_sample_dataset.csv</p>
+                <p className="text-sm text-gray-600">{getSampleData().length} records • 22 columns • 2.7 KB</p>
               </div>
             </div>
             <Button onClick={handleDownload} className="bg-[#D96F32] hover:bg-[#C75D2C] text-white" disabled={isDownloaded}>
@@ -193,6 +269,20 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
             <CardTitle>Upload Your Data (CSV/XML)</CardTitle>
           </CardHeader>
           <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label htmlFor="forecast-months" className="block text-sm font-medium text-gray-700 mb-1">Forecast horizon (months)</label>
+                <Input
+                  id="forecast-months"
+                  type="number"
+                  min={1}
+                  max={12}
+                  value={forecastMonths}
+                  onChange={(e) => setForecastMonths(Number(e.target.value) || 1)}
+                  disabled={isUploading}
+                />
+              </div>
+            </div>
             <FileUploadZone 
               onFileUpload={handleFileUpload} 
               onFileRemove={handleFileRemove} 

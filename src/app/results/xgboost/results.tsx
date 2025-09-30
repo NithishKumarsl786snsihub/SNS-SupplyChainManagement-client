@@ -117,6 +117,12 @@ export default function Results({ onRunAnotherModel, predictions, categoryMap, c
         const defaultProduct = productSet.has("P001") ? "P001" : (sorted[0] || "")
         if (defaultProduct) setSelectedProduct(defaultProduct)
       }
+      const productSet = storeToProducts.get(firstStore)
+      if (productSet) {
+        const sorted = Array.from(productSet).sort((a, b) => a.localeCompare(b))
+        const defaultProduct = productSet.has("P001") ? "P001" : (sorted[0] || "")
+        if (defaultProduct) setSelectedProduct(defaultProduct)
+      }
       return true
     }
     return false
@@ -322,6 +328,17 @@ export default function Results({ onRunAnotherModel, predictions, categoryMap, c
         <div className="mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Store ({storeOptions.length} total)</label>
+            <Select value={selectedStore} onValueChange={(v) => {
+              setSelectedStore(v)
+              const productSet = storeToProducts.get(v)
+              if (productSet) {
+                const sorted = Array.from(productSet).sort((a, b) => a.localeCompare(b))
+                const defaultProduct = productSet.has("P001") ? "P001" : (sorted[0] || "")
+                setSelectedProduct(defaultProduct)
+              } else {
+                setSelectedProduct("")
+              }
+            }}>
             <Select value={selectedStore} onValueChange={(v) => {
               setSelectedStore(v)
               const productSet = storeToProducts.get(v)

@@ -2,40 +2,39 @@
 
 import { useState } from "react"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
-import { ResultsSidebar } from "@/components/sidebar"
 import Upload from "./upload"
 import Results from "./results"
 
-export default function VARIMAResultsPage() {
+export default function VarimaPage() {
+  const [processingDone, setProcessingDone] = useState(false)
+  const [uploadedData, setUploadedData] = useState<any[]>([])
+
   const breadcrumbItems = [
     { label: "Home", href: "/" },
     { label: "Models", href: "/models" },
-    { label: "VARIMA", current: true },
+    { label: "Varima", current: true },
   ]
 
-  const [processingDone, setProcessingDone] = useState(false)
-
-  const handleProcessingComplete = () => {
+  const handleProcessingComplete = (data: any[]) => {
+    setUploadedData(data)
     setProcessingDone(true)
   }
 
   const handleRunAnotherModel = () => {
     setProcessingDone(false)
+    setUploadedData([])
   }
 
   return (
-    <div className="min-h-screen bg-sns-cream/20">
-      {!processingDone ? (
-        <>
-          <ResultsSidebar />
-          <div className="px-4 sm:px-6 lg:pl-[300px] lg:pr-8 py-8">
-            <BreadcrumbNav items={breadcrumbItems} />
-            <Upload onProcessingComplete={handleProcessingComplete} />
-          </div>
-        </>
-      ) : (
-        <Results onRunAnotherModel={handleRunAnotherModel} />
-      )}
+    <div className="min-h-screen bg-gray-50">
+      <div className="px-4 sm:px-6 lg:px-8 py-8">
+        <BreadcrumbNav items={breadcrumbItems} />
+        {!processingDone ? (
+          <Upload onProcessingComplete={handleProcessingComplete} />
+        ) : (
+          <Results data={uploadedData} onRunAnotherModel={handleRunAnotherModel} />
+        )}
+      </div>
     </div>
   )
 }
