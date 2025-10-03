@@ -37,7 +37,7 @@ export default function Results({ onRunAnotherModel }: { onRunAnotherModel: () =
   const [forecastLoading, setForecastLoading] = useState(false)
   const [selectedForecastCategory, setSelectedForecastCategory] = useState('')
   const [categoryForecastResult, setCategoryForecastResult] = useState<any>(null)
-  const [forecastType, setForecastType] = useState<'daily' | 'weekly'>('weekly')
+  const [forecastType, setForecastType] = useState<'daily'>('daily')
   
   // Pricing prediction states
   const [pricingInput, setPricingInput] = useState({
@@ -275,6 +275,7 @@ export default function Results({ onRunAnotherModel }: { onRunAnotherModel: () =
     } finally { setForecastLoading(false) }
   }
 
+
   const breadcrumbItems = [
     { label: 'Home', href: '/' },
     { label: 'Models', href: '/models' },
@@ -323,21 +324,35 @@ export default function Results({ onRunAnotherModel }: { onRunAnotherModel: () =
 
           {activeTab === 'forecast' && (
             <div className="space-y-8">
-              {/* Simple Forecast Controls */}
-              <Card className="shadow-lg border-0 bg-gradient-to-br from-white to-blue-50/30">
-                <CardHeader>
-                  <CardTitle className="text-xl font-bold text-gray-800">Demand Forecasting</CardTitle>
-                  <p className="text-sm text-gray-600">Generate demand forecasts for specific categories</p>
+              {/* Professional Forecast Controls */}
+              <Card className="shadow-xl border-0 bg-gradient-to-br from-white via-blue-50/20 to-indigo-50/30">
+                <CardHeader className="pb-6">
+                  <div className="flex items-center space-x-3 mb-2">
+                    <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg shadow-lg">
+                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <CardTitle className="text-2xl font-bold text-gray-900">Demand Forecasting</CardTitle>
+                      <p className="text-sm text-gray-600 mt-1">Generate professional demand forecasts for specific categories</p>
+                    </div>
+                  </div>
                 </CardHeader>
                       <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    {/* Category Dropdown */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Select Category</label>
+                    {/* Enhanced Category Dropdown */}
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-gray-800 mb-3 flex items-center">
+                        <svg className="w-4 h-4 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                        </svg>
+                        Product Category
+                      </label>
                       <select
                         value={selectedForecastCategory}
                         onChange={(e) => setSelectedForecastCategory(e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md"
                       >
                         <option value="">Choose a category</option>
                         {availableCategories.map((cat) => (
@@ -346,43 +361,29 @@ export default function Results({ onRunAnotherModel }: { onRunAnotherModel: () =
                       </select>
                     </div>
                     
-                    {/* Forecast Type Selection */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Forecast Type</label>
-                      <select
-                        value={forecastType}
-                        onChange={(e) => setForecastType(e.target.value as 'daily' | 'weekly')}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                      >
-                        <option value="weekly">Weekly</option>
-                        <option value="daily">Daily</option>
-                      </select>
-                    </div>
-                    
-                    {/* Forecast Period Input */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Forecast Period ({forecastType === 'weekly' ? 'Weeks' : 'Days'})
+                    {/* Enhanced Forecast Period Input */}
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-gray-800 mb-3 flex items-center">
+                        <svg className="w-4 h-4 text-indigo-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        Forecast Period
                       </label>
                       <input
                         type="number"
                         min="1"
-                        max={forecastType === 'weekly' ? "24" : "168"}
-                        value={forecastType === 'weekly' ? Math.ceil(forecastDays / 7) : forecastDays}
-                        onChange={(e) => {
-                          const value = Number(e.target.value)
-                          if (forecastType === 'weekly') {
-                            setForecastDays(value * 7)
-                          } else {
-                            setForecastDays(value)
-                          }
-                        }}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                        placeholder={forecastType === 'weekly' ? "4" : "28"}
+                        max="180"
+                        value={forecastDays}
+                        onChange={(e) => setForecastDays(Number(e.target.value))}
+                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md"
+                        placeholder="28"
                       />
+                      <p className="text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded-lg">
+                        📅 Maximum 180 days (6 months) forecast available
+                      </p>
                     </div>
                     
-                    {/* Forecast Button */}
+                    {/* Enhanced Forecast Button */}
                     <div className="flex items-end">
                       <Button
                         onClick={() => {
@@ -391,18 +392,18 @@ export default function Results({ onRunAnotherModel }: { onRunAnotherModel: () =
                           }
                         }}
                         disabled={!selectedForecastCategory || forecastLoading}
-                        className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 text-white shadow-xl hover:shadow-2xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed transform hover:-translate-y-1 font-semibold py-4 rounded-xl"
                       >
                         {forecastLoading ? (
-                          <div className="flex items-center">
+                          <div className="flex items-center justify-center">
                             <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
-                            Generating...
+                            Generating Forecast...
                           </div>
                         ) : (
-                          <div className="flex items-center">
+                          <div className="flex items-center justify-center">
                             <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                             </svg>
@@ -418,55 +419,105 @@ export default function Results({ onRunAnotherModel }: { onRunAnotherModel: () =
               {/* Forecast Results */}
               {categoryForecastResult && (
                 <div className="space-y-6">
-                  {/* Chart Header */}
-                  <div className="text-center">
-                    <h3 className="text-2xl font-bold text-gray-800 mb-2">
-                      {categoryForecastResult.category} - {forecastType === 'weekly' ? 'Weekly' : 'Daily'} Demand Forecast
-                    </h3>
-                    <p className="text-gray-600">
-                      {forecastType === 'weekly' 
-                        ? `Weekly demand prediction for ${Math.ceil(categoryForecastResult.days / 7)} weeks`
-                        : `Daily demand prediction for ${categoryForecastResult.days} days`
-                      }
-                    </p>
+                  {/* Simple Chart Heading */}
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h3 className="text-2xl font-bold text-gray-900">
+                        {categoryForecastResult.category} - Daily Demand Forecast
+                      </h3>
+                      <p className="text-gray-600 mt-1">
+                        Professional demand prediction for {categoryForecastResult.days} days
+                      </p>
+                    </div>
+                    <div className="flex items-center space-x-6 text-sm text-gray-600">
+                      <div className="flex items-center">
+                        <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
+                        <span>Demand Forecast</span>
+                      </div>
+                      <div className="flex items-center">
+                        <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+                        <span>Upper Bound</span>
+                      </div>
+                      <div className="flex items-center">
+                        <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
+                        <span>Lower Bound</span>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Demand Chart */}
-                  {categoryForecastResult.forecast.forecast && (
+                  {(categoryForecastResult.forecast?.forecast || categoryForecastResult.forecast) && (
                     <Card className="shadow-xl border-0 bg-gradient-to-br from-white to-blue-50/30">
                       <CardContent className="p-8">
-                        <div className="h-[500px] w-full">
+                        <div className={`w-full ${forecastDays > 90 ? 'h-[600px]' : 'h-[500px]'}`}>
                           <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={(() => {
-                              const forecasts = categoryForecastResult.forecast.forecast
+                              // Handle different data structures for different forecast types
+                              let forecasts = null
+                              if (categoryForecastResult.forecast?.forecast) {
+                                // Daily forecast structure
+                                forecasts = categoryForecastResult.forecast.forecast
+                              } else if (categoryForecastResult.forecast) {
+                                // Weekly/Monthly forecast structure
+                                forecasts = categoryForecastResult.forecast
+                              }
                               
-                              if (forecastType === 'weekly') {
-                                // Group daily forecasts into weekly data
-                                const weeklyData: any[] = []
-                                
-                                for (let i = 0; i < forecasts.length; i += 7) {
-                                  const weekForecasts = forecasts.slice(i, i + 7)
-                                  const weekStart = new Date(weekForecasts[0].date)
-                                  const weekEnd = new Date(weekForecasts[weekForecasts.length - 1].date)
-                                  const weekNumber = Math.floor(i / 7) + 1
+                              if (!forecasts || !Array.isArray(forecasts)) {
+                                return []
+                              }
+                              
+                              if (false) {
+                                // For weekly forecasts, we might have weekly data directly or need to aggregate daily data
+                                if (forecasts.length > 0 && forecasts[0].week_number) {
+                                  // Direct weekly data
+                                  return forecasts.map((f: any) => ({
+                                    date: f.week_start,
+                                    prediction: f.prediction,
+                                    upperBound: f.upper_bound,
+                                    lowerBound: f.lower_bound,
+                                    weekNumber: f.week_number,
+                                    formattedDate: `Week ${f.week_number}`,
+                                    weekRange: `${f.week_start} - ${f.week_end}`
+                                  }))
+                                } else {
+                                  // Group daily forecasts into weekly data
+                                  const weeklyData: any[] = []
                                   
-                                  // Calculate weekly average demand and bounds
-                                  const weeklyAvg = weekForecasts.reduce((sum: number, f: any) => sum + f.prediction, 0) / weekForecasts.length
-                                  const weeklyUpper = weekForecasts.reduce((sum: number, f: any) => sum + (f.upper_bound || f.prediction * 1.2), 0) / weekForecasts.length
-                                  const weeklyLower = weekForecasts.reduce((sum: number, f: any) => sum + (f.lower_bound || f.prediction * 0.8), 0) / weekForecasts.length
+                                  for (let i = 0; i < forecasts.length; i += 7) {
+                                    const weekForecasts = forecasts.slice(i, i + 7)
+                                    const weekStart = new Date(weekForecasts[0].date)
+                                    const weekEnd = new Date(weekForecasts[weekForecasts.length - 1].date)
+                                    const weekNumber = Math.floor(i / 7) + 1
+                                    
+                                    // Calculate weekly average demand and bounds
+                                    const weeklyAvg = weekForecasts.reduce((sum: number, f: any) => sum + f.prediction, 0) / weekForecasts.length
+                                    const weeklyUpper = weekForecasts.reduce((sum: number, f: any) => sum + (f.upper_bound || f.prediction * 1.2), 0) / weekForecasts.length
+                                    const weeklyLower = weekForecasts.reduce((sum: number, f: any) => sum + (f.lower_bound || f.prediction * 0.8), 0) / weekForecasts.length
+                                    
+                                    weeklyData.push({
+                                      date: weekForecasts[0].date,
+                                      prediction: weeklyAvg,
+                                      upperBound: weeklyUpper,
+                                      lowerBound: weeklyLower,
+                                      weekNumber: weekNumber,
+                                      formattedDate: `Week ${weekNumber}`,
+                                      weekRange: `${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                                    })
+                                  }
                                   
-                                  weeklyData.push({
-                                    date: weekForecasts[0].date,
-                                    prediction: weeklyAvg,
-                                    upperBound: weeklyUpper,
-                                    lowerBound: weeklyLower,
-                                    weekNumber: weekNumber,
-                                    formattedDate: `Week ${weekNumber}`,
-                                    weekRange: `${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
-                                  })
+                                  return weeklyData
                                 }
-                                
-                                return weeklyData
+                              } else if (false) {
+                                // For monthly forecasts, we have monthly data directly
+                                return forecasts.map((f: any) => ({
+                                  date: f.month_start,
+                                  prediction: f.prediction,
+                                  upperBound: f.upper_bound,
+                                  lowerBound: f.lower_bound,
+                                  monthNumber: f.month_number,
+                                  formattedDate: f.month_name,
+                                  quarter: f.quarter
+                                }))
                               } else {
                                 // Use daily data directly with bounds
                                 return forecasts.map((f: any, index: number) => ({
@@ -496,26 +547,56 @@ export default function Results({ onRunAnotherModel }: { onRunAnotherModel: () =
                               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" strokeOpacity={0.5} />
                               <XAxis 
                                 dataKey="formattedDate" 
-                                tick={{ fontSize: 14, fill: '#6b7280', fontWeight: '500' }}
+                                tick={{ fontSize: 12, fill: '#6b7280', fontWeight: '500' }}
                                 tickLine={{ stroke: '#d1d5db' }}
-                                axisLine={{ stroke: '#d1d5db', strokeWidth: 2 }}
+                                axisLine={{ stroke: '#d1d5db', strokeWidth: 1 }}
                                 label={{ 
-                                  value: forecastType === 'weekly' ? 'Week' : 'Day', 
+                                  value: 'Day', 
                                   position: 'insideBottom', 
-                                  offset: -10, 
-                                  style: { textAnchor: 'middle', fill: '#374151', fontSize: '14px', fontWeight: '600' } 
+                                  offset: 0, 
+                                  style: { 
+                                    textAnchor: 'middle', 
+                                    fill: '#000000', 
+                                    fontSize: '16px', 
+                                    fontWeight: '800',
+                                    fontFamily: 'Arial, sans-serif'
+                                  } 
                                 }}
+                                interval="preserveStartEnd"
+                                minTickGap={30}
+                                angle={forecastDays > 60 ? -45 : 0}
+                                textAnchor={forecastDays > 60 ? "end" : "middle"}
+                                height={forecastDays > 60 ? 60 : 40}
                               />
                               <YAxis 
-                                tickFormatter={(value) => value.toFixed(1)} 
-                                allowDecimals={true} 
+                                tickFormatter={(value) => value.toFixed(0)} 
+                                allowDecimals={false} 
                                 width={80} 
-                                tickCount={6}
-                                domain={['dataMin - 0.5', 'dataMax + 0.5']}
-                                tick={{ fontSize: 14, fill: '#6b7280', fontWeight: '500' }}
-                                tickLine={{ stroke: '#d1d5db' }}
-                                axisLine={{ stroke: '#d1d5db', strokeWidth: 2 }}
-                                label={{ value: 'Demand (Units)', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fill: '#374151', fontSize: '14px', fontWeight: '600' } }}
+                                domain={[0, 'dataMax + 1']}
+                                tick={{ fontSize: 12, fill: '#6b7280', fontWeight: '500' }}
+                                tickLine={{ stroke: '#d1d5db', strokeWidth: 1 }}
+                                axisLine={{ stroke: '#d1d5db', strokeWidth: 1 }}
+                                label={{ 
+                                  value: 'Demand (Units)', 
+                                  angle: -90, 
+                                  position: 'insideLeft', 
+                                  style: { 
+                                    textAnchor: 'middle', 
+                                    fill: '#374151', 
+                                    fontSize: '12px', 
+                                    fontWeight: '600' 
+                                  } 
+                                }}
+                                interval={1}
+                                tickCount={Math.ceil((forecastDays > 90 ? 600 : 500) / 2)}
+                                ticks={(() => {
+                                  const maxValue = Math.ceil((forecastDays > 90 ? 600 : 500) / 2) * 2
+                                  const ticks = []
+                                  for (let i = 0; i <= maxValue; i += 2) {
+                                    ticks.push(i)
+                                  }
+                                  return ticks
+                                })()}
                               />
                               <Tooltip 
                                 contentStyle={{ 
@@ -531,9 +612,7 @@ export default function Results({ onRunAnotherModel }: { onRunAnotherModel: () =
                                   if (name === 'Demand Forecast') {
                                     return [
                                       `${value.toFixed(1)} units`, 
-                                      forecastType === 'weekly' 
-                                        ? `Week ${props.payload.weekNumber} (${props.payload.weekRange})`
-                                        : `Day ${props.payload.dayNumber} (${props.payload.dayRange})`
+                                      `Day ${props.payload.dayNumber} (${props.payload.dayRange})`
                                     ]
                                   } else if (name === 'Upper Bound') {
                                     return [`${value.toFixed(1)} units`, 'Upper Bound']
@@ -544,31 +623,34 @@ export default function Results({ onRunAnotherModel }: { onRunAnotherModel: () =
                                 }}
                               />
                               <Line 
-                                type="monotone" 
+                                type="linear" 
                                 dataKey="prediction" 
-                                stroke="#3b82f6" 
-                                strokeWidth={4} 
-                                dot={{ fill: '#3b82f6', strokeWidth: 3, r: 5 }}
-                                activeDot={{ r: 8, stroke: '#3b82f6', strokeWidth: 3, fill: 'white' }}
+                                stroke="#2563eb" 
+                                strokeWidth={2.5} 
+                                dot={{ fill: '#2563eb', strokeWidth: 1, r: 3, stroke: '#ffffff' }}
+                                activeDot={{ r: 5, stroke: '#2563eb', strokeWidth: 2, fill: '#ffffff' }}
                                 name="Demand Forecast"
+                                connectNulls={false}
                               />
                               <Line 
-                                type="monotone" 
+                                type="linear" 
                                 dataKey="upperBound" 
-                                stroke="#10b981" 
+                                stroke="#059669" 
                                 strokeWidth={2} 
                                 strokeDasharray="5 5"
                                 dot={false}
                                 name="Upper Bound"
+                                connectNulls={false}
                               />
                               <Line 
-                                type="monotone" 
+                                type="linear" 
                                 dataKey="lowerBound" 
-                                stroke="#ef4444" 
+                                stroke="#dc2626" 
                                 strokeWidth={2} 
                                 strokeDasharray="5 5"
                                 dot={false}
                                 name="Lower Bound"
+                                connectNulls={false}
                               />
                               <Legend 
                                 verticalAlign="top" 
@@ -587,118 +669,193 @@ export default function Results({ onRunAnotherModel }: { onRunAnotherModel: () =
                     </Card>
                   )}
 
-                  {/* Insights */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="text-sm font-semibold text-blue-700">Peak Demand</div>
-                        <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                        </svg>
+                  {/* Enhanced Insights */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200 shadow-lg hover:shadow-xl transition-all duration-300">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center space-x-2">
+                          <div className="p-2 bg-blue-500 rounded-lg">
+                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                            </svg>
+                          </div>
+                          <div className="text-sm font-bold text-blue-800">Peak Demand</div>
+                        </div>
                       </div>
-                      <div className="text-2xl font-bold text-blue-800">
+                      <div className="text-3xl font-bold text-blue-900 mb-2">
                         {(() => {
-                          const forecasts = categoryForecastResult.forecast.forecast
+                          // Handle daily forecast data structure
+                          const forecasts = categoryForecastResult.forecast?.forecast
                           
-                          if (forecastType === 'weekly') {
-                            const weeklyData: number[] = []
-                            for (let i = 0; i < forecasts.length; i += 7) {
-                              const weekForecasts = forecasts.slice(i, i + 7)
-                              const weeklyAvg = weekForecasts.reduce((sum: number, f: any) => sum + f.prediction, 0) / weekForecasts.length
-                              weeklyData.push(weeklyAvg)
-                            }
-                            return weeklyData.length > 0 ? Math.max(...weeklyData).toFixed(1) : '0.0'
-                          } else {
-                            const dailyData = forecasts.map((f: any) => f.prediction)
-                            return dailyData.length > 0 ? Math.max(...dailyData).toFixed(1) : '0.0'
+                          if (!forecasts || !Array.isArray(forecasts)) {
+                            return '0.0'
                           }
+                          
+                          const dailyData = forecasts.map((f: any) => f.prediction)
+                          return dailyData.length > 0 ? Math.max(...dailyData).toFixed(1) : '0.0'
                         })()}
                       </div>
-                      <div className="text-xs text-blue-600">
-                        {forecastType === 'weekly' ? 'Highest weekly average demand' : 'Highest daily demand'}
+                      <div className="text-sm text-blue-700 font-medium">
+                        Highest daily demand
                       </div>
                     </div>
                     
-                    <div className="bg-green-50 rounded-lg p-4 border border-green-200">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="text-sm font-semibold text-green-700">Lowest Demand</div>
-                        <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
-                        </svg>
+                    <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200 shadow-lg hover:shadow-xl transition-all duration-300">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center space-x-2">
+                          <div className="p-2 bg-green-500 rounded-lg">
+                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
+                            </svg>
+                          </div>
+                          <div className="text-sm font-bold text-green-800">Lowest Demand</div>
+                        </div>
                       </div>
-                      <div className="text-2xl font-bold text-green-800">
+                      <div className="text-3xl font-bold text-green-900 mb-2">
                         {(() => {
-                          const forecasts = categoryForecastResult.forecast.forecast
+                          // Handle daily forecast data structure
+                          const forecasts = categoryForecastResult.forecast?.forecast
                           
-                          if (forecastType === 'weekly') {
-                            const weeklyData: number[] = []
-                            for (let i = 0; i < forecasts.length; i += 7) {
-                              const weekForecasts = forecasts.slice(i, i + 7)
-                              const weeklyAvg = weekForecasts.reduce((sum: number, f: any) => sum + f.prediction, 0) / weekForecasts.length
-                              weeklyData.push(weeklyAvg)
-                            }
-                            return weeklyData.length > 0 ? Math.min(...weeklyData).toFixed(1) : '0.0'
-                          } else {
-                            const dailyData = forecasts.map((f: any) => f.prediction)
-                            return dailyData.length > 0 ? Math.min(...dailyData).toFixed(1) : '0.0'
+                          if (!forecasts || !Array.isArray(forecasts)) {
+                            return '0.0'
                           }
+                          
+                          const dailyData = forecasts.map((f: any) => f.prediction)
+                          return dailyData.length > 0 ? Math.min(...dailyData).toFixed(1) : '0.0'
                         })()}
                       </div>
-                      <div className="text-xs text-green-600">
-                        {forecastType === 'weekly' ? 'Lowest weekly average demand' : 'Lowest daily demand'}
+                      <div className="text-sm text-green-700 font-medium">
+                        Lowest daily demand
                       </div>
                     </div>
                     
-                    <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="text-sm font-semibold text-purple-700">Trend</div>
-                        <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
-                        </svg>
+                    <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 border border-purple-200 shadow-lg hover:shadow-xl transition-all duration-300">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center space-x-2">
+                          <div className="p-2 bg-purple-500 rounded-lg">
+                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+                            </svg>
+                          </div>
+                          <div className="text-sm font-bold text-purple-800">Trend</div>
+                        </div>
                       </div>
-                      <div className="text-2xl font-bold text-purple-800">
+                      <div className="text-3xl font-bold text-purple-900 mb-2">
                         {(() => {
-                          const forecasts = categoryForecastResult.forecast.forecast
+                          // Robust Trend Analysis using Multiple Methods
+                          let forecasts = null
+                          if (categoryForecastResult.forecast?.forecast) {
+                            forecasts = categoryForecastResult.forecast.forecast
+                          } else if (categoryForecastResult.forecast) {
+                            forecasts = categoryForecastResult.forecast
+                          }
                           
-                          if (forecastType === 'weekly') {
-                            const weeklyData: number[] = []
-                            for (let i = 0; i < forecasts.length; i += 7) {
-                              const weekForecasts = forecasts.slice(i, i + 7)
-                              const weeklyAvg = weekForecasts.reduce((sum: number, f: any) => sum + f.prediction, 0) / weekForecasts.length
-                              weeklyData.push(weeklyAvg)
+                          if (!forecasts || !Array.isArray(forecasts) || forecasts.length < 3) {
+                            return '📊 Insufficient Data'
+                          }
+                          
+                          // Extract prediction data
+                          const values = forecasts.map((f: any) => f.prediction)
+                          const n = values.length
+                          
+                          // Method 1: Simple First vs Last Comparison
+                          const firstValue = values[0]
+                          const lastValue = values[n - 1]
+                          const simpleChange = ((lastValue - firstValue) / firstValue) * 100
+                          
+                          // Method 2: Moving Average Trend (more robust to noise)
+                          const windowSize = Math.max(3, Math.floor(n / 4)) // 25% of data or min 3
+                          const firstWindow = values.slice(0, windowSize)
+                          const lastWindow = values.slice(-windowSize)
+                          const firstAvg = firstWindow.reduce((sum, val) => sum + val, 0) / firstWindow.length
+                          const lastAvg = lastWindow.reduce((sum, val) => sum + val, 0) / lastWindow.length
+                          const avgChange = ((lastAvg - firstAvg) / firstAvg) * 100
+                          
+                          // Method 3: Linear Regression (for reference)
+                          const data = values.map((val, index) => ({ x: index, y: val }))
+                          const sumX = data.reduce((sum, point) => sum + point.x, 0)
+                          const sumY = data.reduce((sum, point) => sum + point.y, 0)
+                          const sumXY = data.reduce((sum, point) => sum + point.x * point.y, 0)
+                          const sumXX = data.reduce((sum, point) => sum + point.x * point.x, 0)
+                          const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX)
+                          const slopeChange = (slope / (sumY / n)) * 100 // Normalized slope
+                          
+                          // Method 4: Trend Consistency Check
+                          let positiveDays = 0
+                          let negativeDays = 0
+                          for (let i = 1; i < values.length; i++) {
+                            if (values[i] > values[i-1]) positiveDays++
+                            else if (values[i] < values[i-1]) negativeDays++
+                          }
+                          const consistency = Math.max(positiveDays, negativeDays) / (n - 1)
+                          
+                          // Combine methods for robust trend detection
+                          const trendScore = (Math.abs(simpleChange) * 0.3) + (Math.abs(avgChange) * 0.4) + (Math.abs(slopeChange) * 0.2) + (consistency * 50 * 0.1)
+                          
+                          // Determine trend direction and strength
+                          const isRising = avgChange > 0 && slope > 0
+                          const isDeclining = avgChange < 0 && slope < 0
+                          const isStable = Math.abs(avgChange) < 2 && Math.abs(slopeChange) < 2
+                          
+                          // Calculate confidence based on consistency and magnitude
+                          const confidence = Math.min(100, trendScore)
+                          const confidencePercent = confidence.toFixed(1)
+                          
+                          if (isStable || trendScore < 5) {
+                            return `➡️ Stable (${confidencePercent}%)`
+                          } else if (isRising) {
+                            if (trendScore > 20) {
+                              return `📈 Strong Rising (${confidencePercent}%)`
+                            } else if (trendScore > 10) {
+                              return `↗️ Rising (${confidencePercent}%)`
+                            } else {
+                              return `↗️ Weak Rising (${confidencePercent}%)`
                             }
-                            if (weeklyData.length < 2) return '📊 Insufficient Data'
-                            const firstHalf = weeklyData.slice(0, Math.floor(weeklyData.length / 2))
-                            const secondHalf = weeklyData.slice(Math.floor(weeklyData.length / 2))
-                            const firstAvg = firstHalf.reduce((a: number, b: number) => a + b, 0) / firstHalf.length
-                            const secondAvg = secondHalf.reduce((a: number, b: number) => a + b, 0) / secondHalf.length
-                            return secondAvg > firstAvg ? '↗️ Rising' : '↘️ Declining'
+                          } else if (isDeclining) {
+                            if (trendScore > 20) {
+                              return `📉 Strong Declining (${confidencePercent}%)`
+                            } else if (trendScore > 10) {
+                              return `↘️ Declining (${confidencePercent}%)`
+                            } else {
+                              return `↘️ Weak Declining (${confidencePercent}%)`
+                            }
                           } else {
-                            const dailyData = forecasts.map((f: any) => f.prediction)
-                            if (dailyData.length < 2) return '📊 Insufficient Data'
-                            const firstHalf = dailyData.slice(0, Math.floor(dailyData.length / 2))
-                            const secondHalf = dailyData.slice(Math.floor(dailyData.length / 2))
-                            const firstAvg = firstHalf.reduce((a: number, b: number) => a + b, 0) / firstHalf.length
-                            const secondAvg = secondHalf.reduce((a: number, b: number) => a + b, 0) / secondHalf.length
-                            return secondAvg > firstAvg ? '↗️ Rising' : '↘️ Declining'
+                            return `📊 Mixed Pattern (${confidencePercent}%)`
                           }
                         })()}
                       </div>
-                      <div className="text-xs text-purple-600">
-                        {forecastType === 'weekly' ? 'Weekly demand trend direction' : 'Daily demand trend direction'}
+                      <div className="text-sm text-purple-700 font-medium">
+                        Daily demand trend direction
                       </div>
                     </div>
                     
-                    <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="text-sm font-semibold text-orange-700">Confidence Range</div>
-                        <svg className="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                        </svg>
+                    <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-6 border border-orange-200 shadow-lg hover:shadow-xl transition-all duration-300">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center space-x-2">
+                          <div className="p-2 bg-orange-500 rounded-lg">
+                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                          </div>
+                          <div className="text-sm font-bold text-orange-800">Confidence Range</div>
+                        </div>
                       </div>
-                      <div className="text-2xl font-bold text-orange-800">
+                      <div className="text-3xl font-bold text-orange-900 mb-2">
                         {(() => {
-                          const forecasts = categoryForecastResult.forecast.forecast
+                          // Handle different data structures for different forecast types
+                          let forecasts = null
+                          if (categoryForecastResult.forecast?.forecast) {
+                            // Daily forecast structure
+                            forecasts = categoryForecastResult.forecast.forecast
+                          } else if (categoryForecastResult.forecast) {
+                            // Weekly/Monthly forecast structure
+                            forecasts = categoryForecastResult.forecast
+                          }
+                          
+                          if (!forecasts || !Array.isArray(forecasts)) {
+                            return '0%'
+                          }
+                          
                           const predictions = forecasts.map((f: any) => f.prediction)
                           const upperBounds = forecasts.map((f: any) => f.upper_bound || f.prediction * 1.2)
                           const lowerBounds = forecasts.map((f: any) => f.lower_bound || f.prediction * 0.8)
@@ -713,7 +870,7 @@ export default function Results({ onRunAnotherModel }: { onRunAnotherModel: () =
                           return `${percentage}%`
                         })()}
                       </div>
-                      <div className="text-xs text-orange-600">Average uncertainty range</div>
+                      <div className="text-sm text-orange-700 font-medium">80% confidence interval</div>
                     </div>
                   </div>
 
@@ -727,13 +884,33 @@ export default function Results({ onRunAnotherModel }: { onRunAnotherModel: () =
                         </div>
                         <div className="flex items-center space-x-2">
                           <div className="text-sm text-gray-500">
-                            {categoryForecastResult.forecast.forecast.length} records
+                            {(() => {
+                              let forecasts = null
+                              if (categoryForecastResult.forecast?.forecast) {
+                                forecasts = categoryForecastResult.forecast.forecast
+                              } else if (categoryForecastResult.forecast) {
+                                forecasts = categoryForecastResult.forecast
+                              }
+                              return forecasts ? forecasts.length : 0
+                            })()} records
                           </div>
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => {
-                              const csvData = categoryForecastResult.forecast.forecast.map((f: any, index: number) => ({
+                              // Handle different data structures for different forecast types
+                              let forecasts = null
+                              if (categoryForecastResult.forecast?.forecast) {
+                                forecasts = categoryForecastResult.forecast.forecast
+                              } else if (categoryForecastResult.forecast) {
+                                forecasts = categoryForecastResult.forecast
+                              }
+                              
+                              if (!forecasts || !Array.isArray(forecasts)) {
+                                return
+                              }
+                              
+                              const csvData = forecasts.map((f: any, index: number) => ({
                                 Date: new Date(f.date).toLocaleDateString('en-US', { 
                                   year: 'numeric', 
                                   month: 'short', 
@@ -745,7 +922,7 @@ export default function Results({ onRunAnotherModel }: { onRunAnotherModel: () =
                                   if (index === 0) return '0.0'
                                   
                                   const currentValue = f.prediction
-                                  const previousValue = categoryForecastResult.forecast.forecast[index - 1].prediction
+                                  const previousValue = forecasts[index - 1].prediction
                                   const difference = currentValue - previousValue
                                   
                                   // Round to 1 decimal place to avoid floating point precision issues
@@ -796,7 +973,19 @@ export default function Results({ onRunAnotherModel }: { onRunAnotherModel: () =
                           </tr>
                         </thead>
                         <tbody>
-                            {categoryForecastResult.forecast.forecast.map((f: any, index: number) => (
+                            {(() => {
+                              let forecasts = null
+                              if (categoryForecastResult.forecast?.forecast) {
+                                forecasts = categoryForecastResult.forecast.forecast
+                              } else if (categoryForecastResult.forecast) {
+                                forecasts = categoryForecastResult.forecast
+                              }
+                              
+                              if (!forecasts || !Array.isArray(forecasts)) {
+                                return null
+                              }
+                              
+                              return forecasts.map((f: any, index: number) => (
                               <tr key={index} className="border-b border-gray-100 hover:bg-gray-50/50">
                                 <td className="py-3 px-4">
                                   <div className="flex items-center">
@@ -832,7 +1021,7 @@ export default function Results({ onRunAnotherModel }: { onRunAnotherModel: () =
                                     }
                                     
                                     const currentValue = f.prediction
-                                    const previousValue = categoryForecastResult.forecast.forecast[index - 1].prediction
+                                    const previousValue = forecasts[index - 1].prediction
                                     const difference = currentValue - previousValue
                                     
                                     // Round to 1 decimal place to avoid floating point precision issues
@@ -847,8 +1036,9 @@ export default function Results({ onRunAnotherModel }: { onRunAnotherModel: () =
                                     }
                                   })()}
                                 </td>
-                            </tr>
-                          ))}
+                              </tr>
+                              ))
+                            })()}
                         </tbody>
                       </table>
           </div>
@@ -856,6 +1046,7 @@ export default function Results({ onRunAnotherModel }: { onRunAnotherModel: () =
                 </Card>
                 </div>
               )}
+
         </div>
           )}
 
@@ -1007,7 +1198,7 @@ export default function Results({ onRunAnotherModel }: { onRunAnotherModel: () =
                                 formatter={(value: any, name: string) => [formatUnits(value), 'Forecast']}
                               />
                               <Line 
-                                type="monotone" 
+                                type="linear" 
                                 dataKey="forecast" 
                                 stroke="#3b82f6" 
                                 strokeWidth={3} 
@@ -1344,32 +1535,32 @@ export default function Results({ onRunAnotherModel }: { onRunAnotherModel: () =
                                 }}
                               />
                               <Line 
-                                type="monotone" 
+                                type="linear" 
                                 dataKey="lowerBoundValue" 
                                 stroke="#ef4444" 
-                                strokeWidth={4} 
+                                strokeWidth={3} 
                                 strokeDasharray="10 5"
                                 dot={{ fill: '#ef4444', strokeWidth: 2, r: 3 }}
                                 activeDot={{ r: 5, stroke: '#ef4444', strokeWidth: 2, fill: 'white' }}
                                 name="lowerBoundValue"
                               />
                               <Line 
-                                type="monotone" 
+                                type="linear" 
                                 dataKey="upperBoundValue" 
                                 stroke="#10b981" 
-                                strokeWidth={4} 
+                                strokeWidth={3} 
                                 strokeDasharray="10 5"
                                 dot={{ fill: '#10b981', strokeWidth: 2, r: 3 }}
                                 activeDot={{ r: 5, stroke: '#10b981', strokeWidth: 2, fill: 'white' }}
                                 name="upperBoundValue"
                               />
                               <Line 
-                                type="monotone" 
+                                type="linear" 
                                 dataKey="elasticityValue" 
                                 stroke="#8b5cf6" 
-                                strokeWidth={4} 
-                                dot={{ fill: '#8b5cf6', strokeWidth: 3, r: 5 }}
-                                activeDot={{ r: 8, stroke: '#8b5cf6', strokeWidth: 3, fill: 'white' }}
+                                strokeWidth={3} 
+                                dot={{ fill: '#8b5cf6', strokeWidth: 2, r: 4 }}
+                                activeDot={{ r: 6, stroke: '#8b5cf6', strokeWidth: 2, fill: 'white' }}
                                 name="elasticityValue"
                               />
                             </LineChart>
@@ -1575,24 +1766,24 @@ export default function Results({ onRunAnotherModel }: { onRunAnotherModel: () =
                             />
                           <Line 
                             yAxisId="demand"
-                            type="monotone" 
+                            type="linear" 
                             dataKey="demand" 
                               stroke="#6366f1" 
                               name="Demand (Units)" 
-                              strokeWidth={4}
-                              dot={{ r: 6, fill: '#6366f1', stroke: '#ffffff', strokeWidth: 2 }}
-                              activeDot={{ r: 8, stroke: '#6366f1', strokeWidth: 3, fill: '#ffffff' }}
+                              strokeWidth={3}
+                              dot={{ r: 5, fill: '#6366f1', stroke: '#ffffff', strokeWidth: 2 }}
+                              activeDot={{ r: 7, stroke: '#6366f1', strokeWidth: 2, fill: '#ffffff' }}
                               connectNulls={false}
                           />
                           <Line 
                             yAxisId="profit"
-                            type="monotone" 
+                            type="linear" 
                             dataKey="profit" 
                               stroke="#10b981" 
                               name="Profit ($)" 
-                              strokeWidth={4}
-                              dot={{ r: 6, fill: '#10b981', stroke: '#ffffff', strokeWidth: 2 }}
-                              activeDot={{ r: 8, stroke: '#10b981', strokeWidth: 3, fill: '#ffffff' }}
+                              strokeWidth={3}
+                              dot={{ r: 5, fill: '#10b981', stroke: '#ffffff', strokeWidth: 2 }}
+                              activeDot={{ r: 7, stroke: '#10b981', strokeWidth: 2, fill: '#ffffff' }}
                               connectNulls={false}
                           />
                         </LineChart>
