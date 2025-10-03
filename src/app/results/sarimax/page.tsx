@@ -6,21 +6,46 @@ import { ResultsSidebar } from "@/components/sidebar"
 import Upload from "./upload"
 import Results from "./results"
 
-export default function CatBoostResults() {
+interface SarimaxPreviewRow {
+  [key: string]: string | number | undefined
+  StoreID: string
+  ProductID: string
+  Date: string
+  PredictedMonthlyDemand: number
+  LowerConfidenceBound?: number
+  UpperConfidenceBound?: number
+}
+
+export interface SarimaxResult {
+  preview?: SarimaxPreviewRow[]
+  steps?: number
+  chart_base64?: string
+  forecast_csv_base64?: string
+  model_info?: unknown
+  storeToProducts?: Record<string, string[]>
+  session_id?: string
+  original_csv_base64?: string
+}
+export type { SarimaxPreviewRow }
+
+export default function SarimaxResultsPage() {
   const breadcrumbItems = [
     { label: "Home", href: "/" },
     { label: "Models", href: "/models" },
-    { label: "CatBoost", current: true },
+    { label: "SARIMAX", current: true },
   ]
 
   const [processingDone, setProcessingDone] = useState(false)
+  const [resultPayload, setResultPayload] = useState<SarimaxResult | null>(null)
 
-  const handleProcessingComplete = () => {
+  const handleProcessingComplete = (payload: SarimaxResult) => {
+    setResultPayload(payload)
     setProcessingDone(true)
   }
 
   const handleRunAnotherModel = () => {
     setProcessingDone(false)
+    setResultPayload(null)
   }
 
   return (
@@ -34,7 +59,7 @@ export default function CatBoostResults() {
           </div>
                       </>
                     ) : (
-        <Results onRunAnotherModel={handleRunAnotherModel} />
+        <Results onRunAnotherModel={handleRunAnotherModel} result={resultPayload} />
       )}
     </div>
   )

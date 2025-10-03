@@ -60,7 +60,10 @@ export function ForecastChart({ data, title = "Forecast vs Actual" }: ForecastCh
                 dataKey="date"
                 stroke="#666"
                 fontSize={12}
-                tickFormatter={(value) => new Date(value).toLocaleDateString()}
+                tickFormatter={(value) => {
+                  const date = new Date(value)
+                  return `${date.getMonth() + 1}/${date.getFullYear()}`
+                }}
               />
               <YAxis stroke="#666" fontSize={12} domain={domain} tickFormatter={(v) => compactFmt.format(Number(v))} />
               <Tooltip
@@ -69,7 +72,10 @@ export function ForecastChart({ data, title = "Forecast vs Actual" }: ForecastCh
                   border: "1px solid #e0e0e0",
                   borderRadius: "8px",
                 }}
-                labelFormatter={(value) => new Date(value).toLocaleDateString()}
+                labelFormatter={(value) => {
+                  const date = new Date(value)
+                  return `${date.getMonth() + 1}/${date.getFullYear()}`
+                }}
                 formatter={(value: number, name: string) => [compactFmt.format(value), name]}
               />
               <Legend />
@@ -98,8 +104,8 @@ export function ForecastChart({ data, title = "Forecast vs Actual" }: ForecastCh
                   <Line
                     type="monotone"
                     dataKey="confidence_upper"
-                    stroke="#E9A23B"
-                    strokeWidth={1}
+                    stroke="#10b981"
+                    strokeWidth={2}
                     strokeDasharray="5 5"
                     dot={false}
                     connectNulls
@@ -108,8 +114,8 @@ export function ForecastChart({ data, title = "Forecast vs Actual" }: ForecastCh
                   <Line
                     type="monotone"
                     dataKey="confidence_lower"
-                    stroke="#E9A23B"
-                    strokeWidth={1}
+                    stroke="#ef4444"
+                    strokeWidth={2}
                     strokeDasharray="5 5"
                     dot={false}
                     connectNulls

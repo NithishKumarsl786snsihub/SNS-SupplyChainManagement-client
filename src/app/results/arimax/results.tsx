@@ -1115,7 +1115,7 @@ export default function Results({ datasetInfo, onRunAnotherModel }: ResultsProps
                     </div>
                   </div>
 
-                  <div className="mb-4">
+                  {/* <div className="mb-4">
                     <label className="flex items-center">
                       <input
                         type="checkbox"
@@ -1125,7 +1125,7 @@ export default function Results({ datasetInfo, onRunAnotherModel }: ResultsProps
                       />
                       Include Confidence Intervals in Optimization
                     </label>
-                  </div>
+                  </div> */}
 
                   <Button
                     onClick={optimizePrice}

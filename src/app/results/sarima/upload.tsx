@@ -47,8 +47,10 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
   // Sample dataset used in the Dataset Preview card
   const getSampleData = () => [
     { date: "2024-01-01", sales: 1200 },
-    { date: "2024-01-02", sales: 1150 },
-    { date: "2024-01-03", sales: 1300 },
+    { date: "2024-02-01", sales: 1150 },
+    { date: "2024-03-01", sales: 1300 },
+    {date:"2024-04-01",sales:1400},
+    {date:"2024-05-01",sales:1650},
   ]
 
   const handleDownload = () => {
