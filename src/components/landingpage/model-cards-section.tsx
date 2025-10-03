@@ -25,24 +25,9 @@ export function ModelCardsSection() {
       category: "ml" as const,
     },
     {
-      name: "Random Forest",
-      description: "Ensemble method for robust predictions with built-in feature importance",
-      category: "ml" as const,
-    },
-    {
       name: "Linear Regression",
       description: "Simple, interpretable baseline model for understanding linear relationships",
       category: "ml" as const,
-    },
-    {
-      name: "LSTM",
-      description: "Recurrent neural network for time series with long-term memory capabilities",
-      category: "deep-learning" as const,
-    },
-    {
-      name: "TFT (Temporal Fusion Transformer)",
-      description: "Temporal Fusion Transformer for complex patterns and multi-horizon forecasting",
-      category: "deep-learning" as const,
     },
     {
       name: "ARIMA",
@@ -100,10 +85,7 @@ export function ModelCardsSection() {
                   model.name === "XGBoost" ? "xgboost" :
                   model.name === "LightGBM" ? "lightgbm" :
                   model.name === "CatBoost" ? "catboost" :
-                  model.name === "Random Forest" ? "random-forest" :
                   model.name === "Linear Regression" ? "linear-regression" :
-                  model.name.startsWith("LSTM") ? "lstm" :
-                  model.name.startsWith("TFT") ? "tft" :
                   model.name === "ARIMA" ? "arima" :
                   model.name === "SARIMA" ? "sarima" :
                    model.name === "SARIMAX" ? "sarimax" :
