@@ -18,10 +18,7 @@ export default function ModelsPage() {
     { name: "XGBoost", description: "Gradient boosting for high accuracy predictions with excellent performance on structured data", category: "ml" as const },
     { name: "LightGBM", description: "Fast gradient boosting with low memory usage, optimized for large datasets", category: "ml" as const },
     { name: "CatBoost", description: "Handles categorical features automatically without preprocessing requirements", category: "ml" as const },
-    { name: "Random Forest", description: "Ensemble method for robust predictions with built-in feature importance", category: "ml" as const },
     { name: "Linear Regression", description: "Simple, interpretable baseline model for understanding linear relationships", category: "ml" as const },
-    { name: "LSTM", description: "Recurrent neural network for time series with long-term memory capabilities", category: "deep-learning" as const },
-    { name: "TFT (Temporal Fusion Transformer)", description: "Temporal Fusion Transformer for complex patterns and multi-horizon forecasting", category: "deep-learning" as const },
     { name: "ARIMA", description: "Classical time series forecasting for stationary data with trend analysis", category: "time-series" as const },
     { name: "SARIMA", description: "Seasonal ARIMA for cyclical data with seasonal pattern recognition", category: "time-series" as const },
     { name: "ARIMAX", description: "ARIMA with external variables for incorporating additional predictors", category: "time-series" as const },
@@ -56,10 +53,7 @@ export default function ModelsPage() {
                     model.name === "XGBoost" ? "xgboost" :
                     model.name === "LightGBM" ? "lightgbm" :
                     model.name === "CatBoost" ? "catboost" :
-                    model.name === "Random Forest" ? "random-forest" :
                     model.name === "Linear Regression" ? "linear-regression" :
-                    model.name.startsWith("LSTM") ? "lstm" :
-                    model.name.startsWith("TFT") ? "tft" :
                     model.name === "ARIMA" ? "arima" :
                     model.name === "SARIMA" ? "sarima" :
                     model.name === "ARIMAX" ? "arimax" :

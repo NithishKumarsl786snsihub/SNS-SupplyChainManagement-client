@@ -4,7 +4,7 @@ A modern, AI-powered supply chain forecasting platform built with Next.js 15, Re
 
 ## 🚀 Features
 
-- **11 Advanced Forecasting Models**: XGBoost, LightGBM, CatBoost, Random Forest, Linear Regression, LSTM, TFT, ARIMA, SARIMA, ARIMAX, and Prophet
+- **8 Advanced Forecasting Models**: XGBoost, LightGBM, CatBoost, Linear Regression, ARIMA, SARIMA, ARIMAX, and Prophet
 - **Interactive Data Visualization**: Real-time charts and graphs using Recharts
 - **Drag & Drop File Upload**: Easy CSV file upload with validation
 - **Responsive Design**: Mobile-first approach with Tailwind CSS
@@ -35,10 +35,7 @@ src/
 │       ├── xgboost/page.tsx
 │       ├── lightgbm/page.tsx
 │       ├── catboost/page.tsx
-│       ├── random-forest/page.tsx
 │       ├── linear-regression/page.tsx
-│       ├── lstm/page.tsx
-│       ├── tft/page.tsx
 │       ├── arima/page.tsx
 │       ├── sarima/page.tsx
 │       ├── arimax/page.tsx
