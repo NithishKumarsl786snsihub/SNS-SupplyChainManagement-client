@@ -182,8 +182,15 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
         }
       } catch {}
 
+      // Encode the original CSV so downstream (Results) can use it for elasticity fallback
+      let original_csv_base64: string | undefined
+      try {
+        const text = await file.text()
+        original_csv_base64 = typeof window !== 'undefined' ? btoa(text) : Buffer.from(text, 'utf-8').toString('base64')
+      } catch {}
+
       setIsUploading(false)
-      onProcessingComplete({ ...result, storeToProducts })
+      onProcessingComplete({ ...result, storeToProducts, original_csv_base64 })
     } catch (err: unknown) {
       const message = typeof err === "object" && err && "message" in err ? String((err as { message?: unknown }).message) : "Upload failed"
       setUploadError(message)

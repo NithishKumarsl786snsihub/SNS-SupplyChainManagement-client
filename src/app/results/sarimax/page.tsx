@@ -24,6 +24,7 @@ export interface SarimaxResult {
   model_info?: unknown
   storeToProducts?: Record<string, string[]>
   session_id?: string
+  original_csv_base64?: string
 }
 export type { SarimaxPreviewRow }
 
