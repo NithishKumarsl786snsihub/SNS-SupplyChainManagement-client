@@ -7,22 +7,22 @@ import Results from "./results"
 
 export default function VarimaPage() {
   const [processingDone, setProcessingDone] = useState(false)
-  const [uploadedData, setUploadedData] = useState<any[]>([])
+  const [results, setResults] = useState<any>(null)
 
   const breadcrumbItems = [
     { label: "Home", href: "/" },
     { label: "Models", href: "/models" },
-    { label: "Varima", current: true },
+    { label: "VARIMA", current: true },
   ]
 
-  const handleProcessingComplete = (data: any[]) => {
-    setUploadedData(data)
+  const handleProcessingComplete = (apiResults: any) => {
+    setResults(apiResults)
     setProcessingDone(true)
   }
 
   const handleRunAnotherModel = () => {
     setProcessingDone(false)
-    setUploadedData([])
+    setResults(null)
   }
 
   return (
@@ -30,9 +30,9 @@ export default function VarimaPage() {
       <div className="px-4 sm:px-6 lg:px-8 py-8">
         <BreadcrumbNav items={breadcrumbItems} />
         {!processingDone ? (
-          <Upload onProcessingComplete={handleProcessingComplete} />
+          <Upload modelName="VARIMA" onProcessingComplete={handleProcessingComplete} />
         ) : (
-          <Results data={uploadedData} onRunAnotherModel={handleRunAnotherModel} />
+          <Results data={results} onRunAnotherModel={handleRunAnotherModel} />
         )}
       </div>
     </div>
