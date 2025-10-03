@@ -15,13 +15,13 @@ export function ModelCardsSection() {
       category: "ml" as const,
     },
     {
-      name: "LightGBM",
-      description: "Fast gradient boosting with low memory usage, optimized for large datasets",
+      name: "CatBoost",
+      description: "Handles categorical features automatically without preprocessing requirements",
       category: "ml" as const,
     },
     {
-      name: "CatBoost",
-      description: "Handles categorical features automatically without preprocessing requirements",
+      name: "LightGBM",
+      description: "Fast gradient boosting with low memory usage, optimized for large datasets",
       category: "ml" as const,
     },
     {
@@ -30,8 +30,18 @@ export function ModelCardsSection() {
       category: "ml" as const,
     },
     {
+      name: "Prophet",
+      description: "Facebook's robust forecasting tool with automatic seasonality detection",
+      category: "time-series" as const,
+    },
+    {
       name: "ARIMA",
       description: "Classical time series forecasting for stationary data with trend analysis",
+      category: "time-series" as const,
+    },
+    {
+      name: "ARIMAX",
+      description: "ARIMA with external variables for incorporating additional predictors",
       category: "time-series" as const,
     },
     {
@@ -42,16 +52,6 @@ export function ModelCardsSection() {
    {
       name: "SARIMAX",
       description: "Seasonal ARIMA with eXogenous variables for time series forecasting with external factors and seasonal patterns",
-      category: "time-series" as const,
-    },
-    {
-      name: "ARIMAX",
-      description: "ARIMA with external variables for incorporating additional predictors",
-      category: "time-series" as const,
-    },
-    {
-      name: "Prophet",
-      description: "Facebook's robust forecasting tool with automatic seasonality detection",
       category: "time-series" as const,
     },
     {
