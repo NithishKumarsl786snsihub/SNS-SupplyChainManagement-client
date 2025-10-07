@@ -76,13 +76,13 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
     formData.append("file", file)
     
     try {
-      console.log('🌐 [FRONTEND] Sending request to http://localhost:8000/api/m3/')
+      console.log('🌐 [FRONTEND] Sending request to http://localhost:8000/api/m3/predict/')
       
       // Create AbortController for timeout handling
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 300000) // 5 minute timeout
       
-      const response = await fetch("http://localhost:8000/api/m3/", {
+      const response = await fetch("http://localhost:8000/api/m3/predict/", {
         method: "POST",
         body: formData,
         credentials: 'include',
