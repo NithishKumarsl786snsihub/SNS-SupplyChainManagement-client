@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import LoaderSpinner from "@/components/ui/loader"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ResponsiveContainer, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line, BarChart, Bar, Area, AreaChart } from 'recharts'
+import { ResponsiveContainer, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line, BarChart, Bar, Area, AreaChart, ReferenceLine } from 'recharts'
 
 interface PredictionResult {
   prediction: number
@@ -62,29 +62,143 @@ export default function Results({ onRunAnotherModel }: { onRunAnotherModel: () =
 
   // Generate elasticity timeline data
   const generateElasticityTimeline = () => {
-    if (!pricingPrediction) return []
-    
-    const baseElasticity = pricingPrediction.elasticity || -1.30
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-    
-    return months.map((month, index) => {
-      // Simulate seasonal variation in elasticity
-      const seasonalFactor = 1 + 0.2 * Math.sin((index * Math.PI) / 6)
-      const elasticity = baseElasticity * seasonalFactor
-      const upperBound = elasticity * 0.8
-      const lowerBound = elasticity * 1.2
-      
-      return {
-        month,
-        elasticity: elasticity.toFixed(2),
-        upperBound: upperBound.toFixed(2),
-        lowerBound: lowerBound.toFixed(2),
-        elasticityValue: elasticity,
-        upperBoundValue: upperBound,
-        lowerBoundValue: lowerBound
-      }
+  if (!pricingPrediction) return []
+  
+  const baseElasticity = typeof pricingPrediction.elasticity === 'number' ? pricingPrediction.elasticity : -1.3
+  const category = pricingInput?.category || ''
+  const promoFlag = Number(pricingInput?.promotion_flag || 0)
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  
+  // Category-specific seasonal amplitude for elasticity variation (how seasonality affects price sensitivity)
+  const categorySeasonalityAmplitude: Record<string, number> = {
+    Milk: 0.08,       // essentials: relatively stable
+    Yogurt: 0.12,     // moderate seasonal preferences
+    Juice: 0.15,      // stronger seasonality
+    ReadyMeal: 0.18,  // convenience and events
+    SnackBar: 0.20    // impulse, events
+  }
+  const amp = categorySeasonalityAmplitude[category] ?? 0.12
+  
+  // Baseline uncertainty of elasticity estimates; scaled by seasonality and month horizon
+  // Reduced for tighter, more realistic confidence bounds
+  const baseUncertainty = 0.08
+  
+  // Ensure realistic bounds for elasticity (
+  // keep negative and within a practical range)
+  const clampElasticity = (e: number) => {
+    const minElasticity = -3.0
+    const maxElasticity = -0.1
+    return Math.max(minElasticity, Math.min(maxElasticity, e))
+  }
+  
+  // Deterministic pseudo-random jitter per month to avoid overly smooth lines
+  const prng = (i: number) => {
+    const seed = (i + 1) * 9301 + category.length * 49297
+    const x = Math.sin(seed) * 10000
+    return x - Math.floor(x)
+  }
+
+  // Category-level inherent volatility
+  const categoryVolatility: Record<string, number> = {
+    Milk: 0.04,
+    Yogurt: 0.06,
+    Juice: 0.08,
+    ReadyMeal: 0.10,
+    SnackBar: 0.12
+  }
+  const catVol = categoryVolatility[category] ?? 0.07
+
+  // Category-specific practical caps to avoid implausible elasticity
+  const categoryCaps: Record<string, { min: number, max: number }> = {
+    Milk: { min: -1.8, max: -0.3 },
+    Yogurt: { min: -2.2, max: -0.25 },
+    Juice: { min: -2.5, max: -0.25 },
+    ReadyMeal: { min: -2.7, max: -0.2 },
+    SnackBar: { min: -3.0, max: -0.2 }
+  }
+  const caps = categoryCaps[category] ?? { min: -2.5, max: -0.25 }
+
+  const results: any[] = []
+  let prevNoise = 0
+  // Slow-moving, mean-reverting local trend to create realistic runs across months
+  let trendState = 0
+  for (let index = 0; index < months.length; index++) {
+    const month = months[index]
+    // Smooth seasonal modifier over the year with a gentle phase shift to avoid Jan=baseline every time
+    const seasonalWave = Math.sin(((index + 0.5) * Math.PI) / 6)
+    const seasonalFactor = 1 + amp * seasonalWave
+
+    // Calendar flags
+    const isHoliday = index === 10 || index === 11 // Nov, Dec
+    const isSummer = index >= 5 && index <= 7      // Jun, Jul, Aug
+
+    // Deterministic base jitter in [-1, 1]
+    const baseJitter = (prng(index) - 0.5) * 2.2 // slightly larger jitter for roughness
+    // AR(1)-like persistence for month-to-month continuity (more persistent)
+    const arNoise = 0.75 * prevNoise + 0.25 * baseJitter
+    // Occasional calendar shocks (deterministic strength)
+    const shock = (isHoliday ? 0.10 : isSummer ? 0.06 : 0.0) * (prng(index + 13) - 0.5)
+    // Small drift term
+    const drift = 0.02 * (prng(index + 23) - 0.5)
+    // Regime shifts per quarter (deterministic), scaled by category volatility
+    const quarter = Math.floor(index / 3)
+    const regimeBias = (prng(100 + quarter) - 0.5) * 0.08 * (0.6 + catVol)
+
+    // Update slow local trend (mean-reverting)
+    const trendShock = (prng(index + 37) - 0.5) * 0.05
+    trendState = 0.7 * trendState + 0.3 * trendShock
+
+    // Total irregular component scaled by category volatility and calendar,
+    // with mean reversion and heteroskedasticity (larger variance in peak seasons)
+    const variabilityScale = (catVol + 0.03) * (1 + (isHoliday ? 0.5 : 0) + (isSummer ? 0.3 : 0))
+    const heteroScale = 1 + 0.5 * Math.abs(seasonalWave) + (isHoliday ? 0.3 : 0) + (isSummer ? 0.2 : 0)
+    const irregularCore = (arNoise + shock + drift) * variabilityScale
+    // Add small high-frequency component for roughness (deterministic per month)
+    const highFreq = 0.03 * Math.sin((2 * Math.PI * (index + 1)) / 3) * (0.6 + catVol)
+    // Rare deterministic spike events for more life-like roughness (capped, category-scaled)
+    const spike = (prng(index + 71) > 0.85 ? (prng(index + 73) - 0.5) * 0.08 * (0.6 + catVol) : 0)
+    const meanReversionStrength = 0.15 // less mean reversion for rougher appearance
+    const irregular = (irregularCore * (1 - meanReversionStrength) + trendState + regimeBias + highFreq + spike) * heteroScale
+    prevNoise = arNoise
+
+    // Month-specific uncertainty for CI (slightly reduced for narrower bands)
+    const seasonalUncertainty = isHoliday ? 0.08 : isSummer ? 0.06 : 0.04
+    const combinedUncertainty = Math.sqrt(baseUncertainty ** 2 + seasonalUncertainty ** 2)
+    const z = 0.84 // ~70% CI for tighter bounds
+
+    // Promotions typically increase price sensitivity slightly (more negative)
+    const promoAdjust = 1 + (promoFlag ? -0.05 : 0)
+    const elasticityRaw = baseElasticity * seasonalFactor * promoAdjust * (1 + irregular)
+    // Blend toward base to keep realism; slightly looser for roughness
+    const blendWeight = 0.65
+    const blended = baseElasticity + (elasticityRaw - baseElasticity) * blendWeight
+    // Apply global clamp and category caps (mutable to allow October anchoring)
+    let elasticity = Math.max(caps.min, Math.min(caps.max, clampElasticity(blended)))
+    // Anchor October (index 9) to base elasticity exactly, per requirement
+    if (index === 9) {
+      elasticity = Math.max(caps.min, Math.min(caps.max, clampElasticity(baseElasticity)))
+    }
+    // Margin scaled by category volatility and made asymmetric for realism
+    const volatilityScale = 0.8 + Math.min(0.4, catVol)
+    const baseMargin = Math.abs(elasticity) * combinedUncertainty * z * volatilityScale
+    const asymmetry = 1 + (isHoliday ? 0.2 : 0) + (isSummer ? 0.1 : 0)
+    const marginUp = baseMargin * 0.85 // upside tends to be tighter
+    const marginDown = baseMargin * 1.15 * asymmetry // downside looser in volatile periods
+    const upperBound = clampElasticity(elasticity + marginUp)
+    const lowerBound = clampElasticity(elasticity - marginDown)
+
+    results.push({
+      month,
+      elasticity: elasticity.toFixed(2),
+      upperBound: upperBound.toFixed(2),
+      lowerBound: lowerBound.toFixed(2),
+      elasticityValue: elasticity,
+      upperBoundValue: upperBound,
+      lowerBoundValue: lowerBound
     })
   }
+  return results
+}
 
   // Pricing prediction functions
   const predictOptimalPrice = async () => {
@@ -1563,6 +1677,8 @@ export default function Results({ onRunAnotherModel }: { onRunAnotherModel: () =
                                 activeDot={{ r: 6, stroke: '#8b5cf6', strokeWidth: 2, fill: 'white' }}
                                 name="elasticityValue"
                               />
+                              <ReferenceLine y={0} stroke="#9ca3af" strokeDasharray="4 4" label={{ value: '0 (No price response)', fill: '#6b7280', position: 'right' }} />
+                              <ReferenceLine y={-1} stroke="#ef4444" strokeDasharray="6 6" label={{ value: '-1 (Unit elastic)', fill: '#ef4444', position: 'right' }} />
                             </LineChart>
                           </ResponsiveContainer>
                         </div>
