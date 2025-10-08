@@ -4,8 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Store, Package, TrendingUp, BarChart3, Calendar } from "lucide-react"
+import { Store, Package, TrendingUp, BarChart3, Target } from "lucide-react"
 
 interface PredictionResult {
   StoreID: string
@@ -20,6 +19,7 @@ interface PredictionResult {
 interface ProductSelectorProps {
   data: PredictionResult[]
   onSelectionChange: (store: string, product: string, filteredData: PredictionResult[]) => void
+  embedded?: boolean
 }
 
 interface StoreProductStats {
@@ -32,23 +32,25 @@ interface StoreProductStats {
   avgConfidence: number
 }
 
-export default function ProductSelector({ data, onSelectionChange }: ProductSelectorProps) {
+export default function ProductSelector({ data, onSelectionChange, embedded = false }: ProductSelectorProps) {
   const [selectedStore, setSelectedStore] = useState<string>("")
   const [selectedProduct, setSelectedProduct] = useState<string>("")
   const [availableStores, setAvailableStores] = useState<string[]>([])
-  const [availableProducts, setAvailableProducts] = useState<string[]>([])
   const [productIdToName, setProductIdToName] = useState<Record<string, string>>({})
   const [storeProductStats, setStoreProductStats] = useState<StoreProductStats[]>([])
-  const [filteredData, setFilteredData] = useState<PredictionResult[]>([])
 
   // Extract unique stores and products
   useEffect(() => {
     if (data && data.length > 0) {
+      console.log(`🔍 [PRODUCT-SELECTOR] Processing ${data.length} data items`)
+      
       const stores = [...new Set(data.map(item => item.StoreID))].sort()
       const products = [...new Set(data.map(item => item.ProductID))].sort()
       
+      console.log(`🏪 [PRODUCT-SELECTOR] Found ${stores.length} unique stores:`, stores)
+      console.log(`📦 [PRODUCT-SELECTOR] Found ${products.length} unique products:`, products)
+      
       setAvailableStores(stores)
-      setAvailableProducts(products)
       const map: Record<string, string> = {}
       data.forEach(item => {
         if (item.ProductID && item.ProductName && !map[item.ProductID]) {
@@ -86,13 +88,16 @@ export default function ProductSelector({ data, onSelectionChange }: ProductSele
       })
       
       setStoreProductStats(stats)
+      console.log(`📊 [PRODUCT-SELECTOR] Calculated ${stats.length} store-product combinations`)
       
       // Set default selections
       if (stores.length > 0 && !selectedStore) {
         setSelectedStore(stores[0])
+        console.log(`🏪 [PRODUCT-SELECTOR] Default store selected: ${stores[0]}`)
       }
       if (products.length > 0 && !selectedProduct) {
         setSelectedProduct(products[0])
+        console.log(`📦 [PRODUCT-SELECTOR] Default product selected: ${products[0]}`)
       }
     }
   }, [data, selectedStore, selectedProduct])
@@ -104,7 +109,6 @@ export default function ProductSelector({ data, onSelectionChange }: ProductSele
         item.StoreID === selectedStore && item.ProductID === selectedProduct
       ).sort((a, b) => new Date(a.Date).getTime() - new Date(b.Date).getTime())
       
-      setFilteredData(filtered)
       onSelectionChange(selectedStore, selectedProduct, filtered)
     }
   }, [selectedStore, selectedProduct, data, onSelectionChange])
@@ -115,14 +119,18 @@ export default function ProductSelector({ data, onSelectionChange }: ProductSele
   )
 
   const handleStoreChange = (store: string) => {
+    console.log(`🏪 [PRODUCT-SELECTOR] Store changed to: ${store}`)
     setSelectedStore(store)
     // Reset product selection when store changes
     const availableProductsForStore = storeProductStats
       .filter(stat => stat.store === store)
       .map(stat => stat.product)
     
+    console.log(`📦 [PRODUCT-SELECTOR] Available products for ${store}:`, availableProductsForStore)
+    
     if (availableProductsForStore.length > 0) {
       setSelectedProduct(availableProductsForStore[0])
+      console.log(`📦 [PRODUCT-SELECTOR] Auto-selected product: ${availableProductsForStore[0]}`)
     }
   }
 
@@ -130,42 +138,36 @@ export default function ProductSelector({ data, onSelectionChange }: ProductSele
     setSelectedProduct(product)
   }
 
-  return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <BarChart3 className="h-5 w-5 text-blue-600" />
-          Product & Store Selection
-        </CardTitle>
-        <p className="text-gray-600 text-sm">
-          Select a store and product combination to view detailed demand forecasting
-        </p>
-      </CardHeader>
-
-      <CardContent>
+  const Inner = (
         <div className="space-y-6">
           {/* Selection Controls */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                <Store className="h-4 w-4" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-3">
+              <label className="text-base font-bold flex items-center gap-2 text-slate-700">
+                <div className="p-1 rounded" style={{ backgroundColor: '#D96F32' }}>
+                  <Store className="h-4 w-4 text-white" />
+                </div>
                 Store Selection
               </label>
               <Select value={selectedStore} onValueChange={handleStoreChange}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger 
+                  className="w-full border-2 border-blue-300 rounded-xl font-semibold transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-700 bg-white"
+                >
                   <SelectValue placeholder="Select a store" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-60 overflow-y-auto rounded-xl border-2 border-blue-300">
                   {availableStores.map(store => {
                     const storeStats = storeProductStats.filter(stat => stat.store === store)
                     const totalProducts = storeStats.length
-                    const totalPredictions = storeStats.reduce((sum, stat) => sum + stat.totalPredictions, 0)
                     
                     return (
-                      <SelectItem key={store} value={store}>
+                      <SelectItem key={store} value={store} className="font-semibold">
                         <div className="flex items-center justify-between w-full">
-                          <span>{store}</span>
-                          <Badge variant="secondary" className="ml-2 text-xs">
+                          <span className="text-slate-700">{store}</span>
+                          <Badge 
+                            className="ml-2 text-xs font-bold px-2 py-1 rounded-lg text-white"
+                            style={{ backgroundColor: '#F8B259' }}
+                          >
                             {totalProducts} products
                           </Badge>
                         </div>
@@ -176,22 +178,32 @@ export default function ProductSelector({ data, onSelectionChange }: ProductSele
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                <Package className="h-4 w-4" />
+            <div className="space-y-3">
+              <label className="text-base font-bold flex items-center gap-2 text-slate-700">
+                <div className="p-1 rounded" style={{ backgroundColor: '#F8B259' }}>
+                  <Package className="h-4 w-4 text-white" />
+                </div>
                 Product Selection
               </label>
               <Select value={selectedProduct} onValueChange={handleProductChange}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger 
+                  className="w-full border-2 border-indigo-300 rounded-xl font-semibold transition-all duration-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-700 bg-white"
+                >
                   <SelectValue placeholder="Select a product" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-60 overflow-y-auto rounded-xl border-2 border-indigo-300">
                   {selectedStore && storeProductStats
                     .filter(stat => stat.store === selectedStore)
                     .map(stat => (
-                      <SelectItem key={stat.product} value={stat.product}>
+                      <SelectItem key={stat.product} value={stat.product} className="font-semibold">
                         <div className="flex items-center justify-between w-full">
-                          <span>{stat.product}{productIdToName[stat.product] ? ` (${productIdToName[stat.product]})` : ''}</span>
+                          <span className="text-slate-700">{stat.product}{productIdToName[stat.product] ? ` (${productIdToName[stat.product]})` : ''}</span>
+                          <Badge 
+                            className="ml-2 text-xs font-bold px-2 py-1 rounded-lg text-white"
+                            style={{ backgroundColor: '#D96F32' }}
+                          >
+                            {stat.totalPredictions} predictions
+                          </Badge>
                         </div>
                       </SelectItem>
                     ))}
@@ -200,54 +212,46 @@ export default function ProductSelector({ data, onSelectionChange }: ProductSele
             </div>
           </div>
 
-          {/* Current Selection Stats */}
-          {currentStats && (
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold text-gray-900">Current Selection</h3>
-                <div className="flex gap-2">
-                  <Badge variant="outline" className="text-xs">
-                    <Store className="h-3 w-3 mr-1" />
-                    {selectedStore}
-                  </Badge>
-                  <Badge variant="outline" className="text-xs">
-                    <Package className="h-3 w-3 mr-1" />
-                    {selectedProduct}
-                  </Badge>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                
-                <div className="text-center">
-                  <div className="flex items-center justify-center gap-1 mb-1">
-                    <TrendingUp className="h-4 w-4 text-green-600" />
-                    <span className="text-sm font-medium text-gray-700">Avg Demand</span>
-                  </div>
-                  <p className="text-xl font-bold text-green-900">{currentStats.avgDemand.toFixed(0)}</p>
-                </div>
-                
-                <div className="text-center">
-                  <div className="flex items-center justify-center gap-1 mb-1">
-                    <TrendingUp className="h-4 w-4 text-orange-600" />
-                    <span className="text-sm font-medium text-gray-700">Peak Demand</span>
-                  </div>
-                  <p className="text-xl font-bold text-orange-900">{currentStats.maxDemand.toFixed(0)}</p>
-                </div>
-                
-                <div className="text-center">
-                  <div className="flex items-center justify-center gap-1 mb-1">
-                    <BarChart3 className="h-4 w-4 text-purple-600" />
-                    <span className="text-sm font-medium text-gray-700">Confidence</span>
-                  </div>
-                  <p className="text-xl font-bold text-purple-900">{(currentStats.avgConfidence * 100).toFixed(1)}%</p>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Removed "Available Store-Product Combinations" for a cleaner UI */}
         </div>
+  )
+
+  if (embedded) {
+    return (
+      <div className="w-full">
+        <div className="pb-4">
+          <div className="flex items-center gap-3 text-2xl font-bold text-slate-800">
+            <div className="p-2 rounded-lg shadow-lg" style={{ backgroundColor: '#D96F32' }}>
+              <BarChart3 className="h-6 w-6 text-white" />
+            </div>
+            Product & Store Selection
+          </div>
+          <p className="text-base font-medium text-slate-600 mt-2">
+            Select a store and product combination to view detailed demand forecasting
+          </p>
+        </div>
+        {Inner}
+      </div>
+    )
+  }
+
+  return (
+    <Card className="w-full border-0 shadow-xl bg-gradient-to-br from-white via-blue-50/20 to-indigo-50/30">
+      <CardHeader className="pb-4">
+        <CardTitle className="flex items-center gap-3 text-2xl font-bold text-slate-800">
+          <div className="p-2 rounded-lg shadow-lg" style={{ backgroundColor: '#D96F32' }}>
+            <BarChart3 className="h-6 w-6 text-white" />
+          </div>
+          Product & Store Selection
+        </CardTitle>
+        <p className="text-base font-medium text-slate-600">
+          Select a store and product combination to view detailed demand forecasting
+        </p>
+      </CardHeader>
+
+      <CardContent>
+        {Inner}
       </CardContent>
     </Card>
   )
