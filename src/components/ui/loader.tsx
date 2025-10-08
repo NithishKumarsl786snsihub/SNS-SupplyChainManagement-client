@@ -1,120 +1,118 @@
-"use client";
-import React from 'react';
+import React, { useEffect, useMemo, useState } from "react"
 
-type LoaderSize = 'sm' | 'md' | 'lg'
-
-interface LoaderProps {
-  size?: LoaderSize;
-  className?: string;
-  fullscreen?: boolean;
-  message?: string;
+interface LoaderSpinnerProps {
+  fullscreen?: boolean
+  size?: "sm" | "md" | "lg"
+  message?: string
+  // Stepper options (when used as processing page)
+  showStepper?: boolean
+  steps?: string[]
+  // Controlled step (0-based). When provided, overrides internal auto-advance.
+  step?: number
+  autoAdvance?: boolean
+  durationPerStepMs?: number
+  onComplete?: () => void
+  background?: string
 }
 
-const scaleBySize: Record<LoaderSize, number> = {
-  sm: 0.85,
-  md: 1,
-  lg: 1.25,
-}
-
-const LoaderSpinner: React.FC<LoaderProps> = ({
-  size = 'md',
-  className = '',
+// Unified animated squares loader with optional stepper
+export const LoaderSpinner: React.FC<LoaderSpinnerProps> = ({
   fullscreen = false,
-  message = 'Loading...',
+  size = "md",
+  message = "",
+  showStepper = false,
+  steps = ["File Upload", "Data Validation", "Column Analysis", "Ready for Processing"],
+  step,
+  autoAdvance = false,
+  durationPerStepMs = 1200,
+  onComplete,
+  background,
 }) => {
-  const scale = scaleBySize[size]
+  const squareSize = size === "sm" ? 8 : size === "md" ? 12 : 16
+  const gap = size === "sm" ? 2 : 3
+  const squares = useMemo(() => Array.from({ length: 9 }), [])
+  const [internalStep, setInternalStep] = useState(0)
+  const currentStep = typeof step === 'number' ? Math.max(0, Math.min(step, steps.length - 1)) : internalStep
 
-  const content = (
-    <div className={`flex flex-col items-center justify-center ${className}`}>
-      <div className="banter-loader" style={{ transform: `scale(${scale})` }}>
-        <div className="banter-loader__box" />
-        <div className="banter-loader__box" />
-        <div className="banter-loader__box" />
-        <div className="banter-loader__box" />
-        <div className="banter-loader__box" />
-        <div className="banter-loader__box" />
-        <div className="banter-loader__box" />
-        <div className="banter-loader__box" />
-        <div className="banter-loader__box" />
+  useEffect(() => {
+    if (!showStepper || typeof step === 'number') return
+    if (!autoAdvance) return
+    if (internalStep >= steps.length - 1) {
+      const t = setTimeout(() => onComplete && onComplete(), 600)
+      return () => clearTimeout(t)
+    }
+    const t = setTimeout(() => setInternalStep((prev: number) => Math.min(prev + 1, steps.length - 1)), durationPerStepMs)
+    return () => clearTimeout(t)
+  }, [showStepper, autoAdvance, internalStep, steps.length, durationPerStepMs, onComplete, step])
+
+  return (
+    <div
+      className={`flex items-center justify-center ${fullscreen ? "fixed inset-0 z-50" : "min-h-screen"}`}
+      style={{
+        backgroundColor: fullscreen ? (background || "#fdfaf6") : undefined,
+        backdropFilter: fullscreen ? undefined : undefined,
+      }}
+    >
+      <div className="flex flex-col items-center gap-8 px-4" style={{ animation: "fadeInScale 500ms cubic-bezier(0.16, 1, 0.3, 1) forwards", opacity: 0 }}>
+        <div className="relative">
+          <div className="absolute inset-0 rounded-2xl" style={{ background: "radial-gradient(circle, rgba(216, 92, 40, 0.15) 0%, transparent 70%)", filter: "blur(20px)", animation: "pulse 2s ease-in-out infinite" }} />
+          <div className="relative grid grid-cols-3 p-6 rounded-2xl" style={{ gap, background: "rgba(255, 255, 255, 0.05)", backdropFilter: "blur(10px)", border: "1px solid rgba(216, 92, 40, 0.1)" }}>
+            {squares.map((_, i) => (
+              <span key={i} style={{ width: squareSize, height: squareSize, backgroundColor: "#d85c28", display: "inline-block", borderRadius: 3, boxShadow: "0 0 15px rgba(216, 92, 40, 0.3)", animation: `squareWave 1.2s cubic-bezier(0.45, 0, 0.55, 1) ${(i % 9) * 100}ms infinite, squareRotate 3s linear infinite` as React.CSSProperties['animation'] }} />
+            ))}
+          </div>
+        </div>
+
+        {message && (
+          <div className="text-center space-y-2">
+            <p className="text-base font-medium" style={{ color: "#1f2937", animation: "fadeIn 600ms ease-out 200ms both" }}>{message}</p>
+            <div className="flex gap-1 justify-center">
+              {[0, 1, 2].map((i) => (
+                <span key={i} style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: "#d85c28", display: "inline-block", animation: `dotPulse 1.4s ease-in-out ${i * 200}ms infinite` }} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {showStepper && (
+          <div className="mt-4 w-full max-w-5xl px-4">
+            <div className="flex items-start justify-center gap-12">
+              {steps.map((label, idx) => {
+                const active = idx === currentStep
+                const completed = idx < currentStep
+                return (
+                  <div key={label} className="flex-none flex flex-col items-center text-center" style={{ animation: `fadeIn 400ms ease-out ${idx * 80}ms both`, minWidth: 160 }}>
+                    <p className="text-sm font-medium" style={{ color: active || completed ? '#1f2937' : '#6b7280', transition: 'color 300ms ease', whiteSpace: 'nowrap', margin: 0 }}>{label}</p>
+                    <div className="relative mt-3 flex items-center justify-center" style={{ width: 40, height: 28 }}>
+                      <div className={`w-6 h-6 rounded-full ${completed || active ? 'bg-[#d85c28]' : 'bg-gray-300'}`} />
+                      {completed && (
+                        <svg width="16" height="16" viewBox="0 0 20 20" className="absolute" style={{ animation: 'checkmark 300ms ease-out both' }}>
+                          <path d="M4 10l4 4 8-8" stroke="white" strokeWidth="2.2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        <style>{`
+          @keyframes squareWave { 0%, 100% { transform: scale(1) translateY(0); opacity: 0.6; } 50% { transform: scale(1.3) translateY(-8px); opacity: 1; } }
+          @keyframes squareRotate { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+          @keyframes fadeInScale { from { opacity: 0; transform: scale(0.9) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+          @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+          @keyframes dotPulse { 0%, 100% { opacity: 0.3; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.2); } }
+          @keyframes slideInLeft { from { opacity: 0; transform: translateX(-30px); } to { opacity: 1; transform: translateX(0); } }
+          @keyframes checkmark { 0% { stroke-dasharray: 0 100; } 100% { stroke-dasharray: 100 100; } }
+          @keyframes progressBar { 0% { width: 0%; transform: translateX(0); } 50% { width: 70%; transform: translateX(0); } 100% { width: 100%; transform: translateX(100%); } }
+          @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.6; transform: scale(0.9); } }
+          @keyframes ping { 75%, 100% { transform: scale(2); opacity: 0; } }
+        `}</style>
       </div>
-      {message && <p className="mt-3 text-sm text-gray-700">{message}</p>}
-      <style jsx>{`
-        .banter-loader {
-          width: 72px;
-          height: 72px;
-          position: relative;
-        }
-        .banter-loader__box {
-          float: left;
-          position: relative;
-          width: 20px;
-          height: 20px;
-          margin-right: 6px;
-        }
-        .banter-loader__box:before {
-          content: "";
-          position: absolute;
-          left: 0;
-          top: 0;
-          width: 100%;
-          height: 100%;
-          background: hsl(var(--sns-orange));
-          border-radius: 7px;
-        }
-        .banter-loader__box:nth-child(3n) {
-          margin-right: 0;
-          margin-bottom: 6px;
-        }
-        .banter-loader__box:nth-child(1):before,
-        .banter-loader__box:nth-child(4):before {
-          margin-left: 26px;
-        }
-        .banter-loader__box:nth-child(3):before {
-          margin-top: 52px;
-        }
-        .banter-loader__box:last-child {
-          margin-bottom: 0;
-        }
-
-        @keyframes moveBox-1 { 9.09%{transform:translate(-26px,0)} 18.18%{transform:translate(0,0)} 27.27%{transform:translate(0,0)} 36.36%{transform:translate(26px,0)} 45.45%{transform:translate(26px,26px)} 54.54%{transform:translate(26px,26px)} 63.63%{transform:translate(26px,26px)} 72.72%{transform:translate(26px,0)} 81.81%{transform:translate(0,0)} 90.90%{transform:translate(-26px,0)} 100%{transform:translate(0,0)} }
-        .banter-loader__box:nth-child(1){animation:moveBox-1 4s infinite}
-
-        @keyframes moveBox-2 { 9.09%{transform:translate(0,0)} 18.18%{transform:translate(26px,0)} 27.27%{transform:translate(0,0)} 36.36%{transform:translate(26px,0)} 45.45%{transform:translate(26px,26px)} 54.54%{transform:translate(26px,26px)} 63.63%{transform:translate(26px,26px)} 72.72%{transform:translate(26px,26px)} 81.81%{transform:translate(0,26px)} 90.90%{transform:translate(0,26px)} 100%{transform:translate(0,0)} }
-        .banter-loader__box:nth-child(2){animation:moveBox-2 4s infinite}
-
-        @keyframes moveBox-3 { 9.09%{transform:translate(-26px,0)} 18.18%{transform:translate(-26px,0)} 27.27%{transform:translate(0,0)} 36.36%{transform:translate(-26px,0)} 45.45%{transform:translate(-26px,0)} 54.54%{transform:translate(-26px,0)} 63.63%{transform:translate(-26px,0)} 72.72%{transform:translate(-26px,0)} 81.81%{transform:translate(-26px,-26px)} 90.90%{transform:translate(0,-26px)} 100%{transform:translate(0,0)} }
-        .banter-loader__box:nth-child(3){animation:moveBox-3 4s infinite}
-
-        @keyframes moveBox-4 { 9.09%{transform:translate(-26px,0)} 18.18%{transform:translate(-26px,0)} 27.27%{transform:translate(-26px,-26px)} 36.36%{transform:translate(0,-26px)} 45.45%{transform:translate(0,0)} 54.54%{transform:translate(0,-26px)} 63.63%{transform:translate(0,-26px)} 72.72%{transform:translate(0,-26px)} 81.81%{transform:translate(-26px,-26px)} 90.90%{transform:translate(-26px,0)} 100%{transform:translate(0,0)} }
-        .banter-loader__box:nth-child(4){animation:moveBox-4 4s infinite}
-
-        @keyframes moveBox-5 { 9.09%{transform:translate(0,0)} 18.18%{transform:translate(0,0)} 27.27%{transform:translate(0,0)} 36.36%{transform:translate(26px,0)} 45.45%{transform:translate(26px,0)} 54.54%{transform:translate(26px,0)} 63.63%{transform:translate(26px,0)} 72.72%{transform:translate(26px,0)} 81.81%{transform:translate(26px,-26px)} 90.90%{transform:translate(0,-26px)} 100%{transform:translate(0,0)} }
-        .banter-loader__box:nth-child(5){animation:moveBox-5 4s infinite}
-
-        @keyframes moveBox-6 { 9.09%{transform:translate(0,0)} 18.18%{transform:translate(-26px,0)} 27.27%{transform:translate(-26px,0)} 36.36%{transform:translate(0,0)} 45.45%{transform:translate(0,0)} 54.54%{transform:translate(0,0)} 63.63%{transform:translate(0,0)} 72.72%{transform:translate(0,26px)} 81.81%{transform:translate(-26px,26px)} 90.90%{transform:translate(-26px,0)} 100%{transform:translate(0,0)} }
-        .banter-loader__box:nth-child(6){animation:moveBox-6 4s infinite}
-
-        @keyframes moveBox-7 { 9.09%{transform:translate(26px,0)} 18.18%{transform:translate(26px,0)} 27.27%{transform:translate(26px,0)} 36.36%{transform:translate(0,0)} 45.45%{transform:translate(0,-26px)} 54.54%{transform:translate(26px,-26px)} 63.63%{transform:translate(0,-26px)} 72.72%{transform:translate(0,-26px)} 81.81%{transform:translate(0,0)} 90.90%{transform:translate(26px,0)} 100%{transform:translate(0,0)} }
-        .banter-loader__box:nth-child(7){animation:moveBox-7 4s infinite}
-
-        @keyframes moveBox-8 { 9.09%{transform:translate(0,0)} 18.18%{transform:translate(-26px,0)} 27.27%{transform:translate(-26px,-26px)} 36.36%{transform:translate(0,-26px)} 45.45%{transform:translate(0,-26px)} 54.54%{transform:translate(0,-26px)} 63.63%{transform:translate(0,-26px)} 72.72%{transform:translate(0,-26px)} 81.81%{transform:translate(26px,-26px)} 90.90%{transform:translate(26px,0)} 100%{transform:translate(0,0)} }
-        .banter-loader__box:nth-child(8){animation:moveBox-8 4s infinite}
-
-        @keyframes moveBox-9 { 9.09%{transform:translate(-26px,0)} 18.18%{transform:translate(-26px,0)} 27.27%{transform:translate(0,0)} 36.36%{transform:translate(-26px,0)} 45.45%{transform:translate(0,0)} 54.54%{transform:translate(0,0)} 63.63%{transform:translate(-26px,0)} 72.72%{transform:translate(-26px,0)} 81.81%{transform:translate(-52px,0)} 90.90%{transform:translate(-26px,0)} 100%{transform:translate(0,0)} }
-        .banter-loader__box:nth-child(9){animation:moveBox-9 4s infinite}
-      `}</style>
     </div>
   )
-
-  if (fullscreen) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/70 backdrop-blur-sm">
-        {content}
-      </div>
-    )
-  }
-
-  return content
 }
 
-export default LoaderSpinner;
+export default LoaderSpinner
