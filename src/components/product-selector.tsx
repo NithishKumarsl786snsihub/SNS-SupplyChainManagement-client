@@ -10,6 +10,7 @@ import { Store, Package, TrendingUp, BarChart3, Calendar } from "lucide-react"
 interface PredictionResult {
   StoreID: string
   ProductID: string
+  ProductName?: string
   Date: string
   PredictedDailySales: number
   Confidence: number
@@ -36,6 +37,7 @@ export default function ProductSelector({ data, onSelectionChange }: ProductSele
   const [selectedProduct, setSelectedProduct] = useState<string>("")
   const [availableStores, setAvailableStores] = useState<string[]>([])
   const [availableProducts, setAvailableProducts] = useState<string[]>([])
+  const [productIdToName, setProductIdToName] = useState<Record<string, string>>({})
   const [storeProductStats, setStoreProductStats] = useState<StoreProductStats[]>([])
   const [filteredData, setFilteredData] = useState<PredictionResult[]>([])
 
@@ -47,6 +49,13 @@ export default function ProductSelector({ data, onSelectionChange }: ProductSele
       
       setAvailableStores(stores)
       setAvailableProducts(products)
+      const map: Record<string, string> = {}
+      data.forEach(item => {
+        if (item.ProductID && item.ProductName && !map[item.ProductID]) {
+          map[item.ProductID] = item.ProductName
+        }
+      })
+      setProductIdToName(map)
       
       // Calculate stats for each store-product combination
       const stats: StoreProductStats[] = []
@@ -182,10 +191,7 @@ export default function ProductSelector({ data, onSelectionChange }: ProductSele
                     .map(stat => (
                       <SelectItem key={stat.product} value={stat.product}>
                         <div className="flex items-center justify-between w-full">
-                          <span>{stat.product}</span>
-                          <Badge variant="outline" className="ml-2 text-xs">
-                            {stat.totalPredictions} points
-                          </Badge>
+                          <span>{stat.product}{productIdToName[stat.product] ? ` (${productIdToName[stat.product]})` : ''}</span>
                         </div>
                       </SelectItem>
                     ))}
@@ -211,14 +217,7 @@ export default function ProductSelector({ data, onSelectionChange }: ProductSele
                 </div>
               </div>
               
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="text-center">
-                  <div className="flex items-center justify-center gap-1 mb-1">
-                    <Calendar className="h-4 w-4 text-blue-600" />
-                    <span className="text-sm font-medium text-gray-700">Data Points</span>
-                  </div>
-                  <p className="text-xl font-bold text-blue-900">{currentStats.totalPredictions}</p>
-                </div>
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                 
                 <div className="text-center">
                   <div className="flex items-center justify-center gap-1 mb-1">
@@ -247,44 +246,7 @@ export default function ProductSelector({ data, onSelectionChange }: ProductSele
             </div>
           )}
 
-          {/* Available Combinations Summary */}
-          <div className="bg-blue-50 rounded-lg p-4">
-            <h4 className="font-semibold text-blue-900 mb-2">Available Store-Product Combinations</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-              {storeProductStats.slice(0, 6).map((stat, index) => (
-                <div 
-                  key={`${stat.store}-${stat.product}`}
-                  className={`p-2 rounded text-sm cursor-pointer transition-colors ${
-                    stat.store === selectedStore && stat.product === selectedProduct
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-white hover:bg-blue-100'
-                  }`}
-                  onClick={() => {
-                    setSelectedStore(stat.store)
-                    setSelectedProduct(stat.product)
-                  }}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium">{stat.store}</span>
-                    <Badge 
-                      variant={stat.store === selectedStore && stat.product === selectedProduct ? "secondary" : "outline"}
-                      className="text-xs"
-                    >
-                      {stat.product}
-                    </Badge>
-                  </div>
-                  <div className="text-xs text-gray-600 mt-1">
-                    {stat.totalPredictions} points • {(stat.avgConfidence * 100).toFixed(0)}% conf
-                  </div>
-                </div>
-              ))}
-              {storeProductStats.length > 6 && (
-                <div className="p-2 rounded text-sm text-gray-500 text-center">
-                  +{storeProductStats.length - 6} more combinations
-                </div>
-              )}
-            </div>
-          </div>
+          {/* Removed "Available Store-Product Combinations" for a cleaner UI */}
         </div>
       </CardContent>
     </Card>

@@ -5,17 +5,10 @@ import { Download, FileText, CheckCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { FileUploadZone } from "@/components/file-upload-zone"
-import { UploadProgress } from "@/components/upload-progress"
+// Removed UploadProgress in favor of dedicated processing loader page
 import { FilePreview } from "@/components/file-preview"
 import { DataTable } from "@/components/data-table"
-import LoaderSpinner from "@/components/ui/loader"
-
-interface UploadStep { 
-  id: string
-  label: string
-  status: "pending" | "processing" | "completed" | "error"
-  message?: string 
-}
+// Removed legacy inline loader; we navigate to processing screen after upload
 
 interface FilePreviewState { 
   fileName: string
@@ -29,19 +22,17 @@ interface FilePreviewState {
 
 interface UploadProps {
   onProcessingComplete: () => void
+  onProcessingProgress?: (step: number) => void
+  onProcessingFinished?: () => void
+  onProcessingError?: (message: string) => void
 }
 
-export default function Upload({ onProcessingComplete }: UploadProps) {
+export default function Upload({ onProcessingComplete, onProcessingProgress, onProcessingFinished, onProcessingError }: UploadProps) {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [isDownloaded, setIsDownloaded] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
-  const [uploadSteps, setUploadSteps] = useState<UploadStep[]>([
-    { id: "upload", label: "File Upload", status: "pending" },
-    { id: "validate", label: "Data Validation", status: "pending" },
-    { id: "parse", label: "Column Analysis", status: "pending" },
-    { id: "ready", label: "Ready for Results", status: "pending" },
-  ])
+  const [forecastDays, setForecastDays] = useState<number>(30)
   const [filePreview, setFilePreview] = useState<FilePreviewState | null>(null)
 
   // Sample dataset used in the Dataset Preview card
@@ -74,6 +65,7 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
     
     const formData = new FormData()
     formData.append("file", file)
+    formData.append("forecast_days", String(forecastDays))
     
     try {
       console.log('🌐 [FRONTEND] Sending request to http://localhost:8000/api/m3/predict/')
@@ -109,7 +101,8 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
         model: result.model,
         status: result.status,
         predictionsCount: result.predictions?.length || 0,
-        dataInfo: result.data_info
+        dataInfo: result.data_info,
+        hasFutureForecast: Boolean(result.future_forecast)
       })
       
       // Log data validation info if available
@@ -144,30 +137,17 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
     
     setIsUploading(true)
     setUploadError(null)
-    setUploadSteps((s) => s.map((st) => (st.id === "upload" ? { ...st, status: "processing", message: `Uploading file (${fileSizeMB.toFixed(1)}MB)...` } : st)))
+    // Immediately show the processing loader screen (no delay)
+    onProcessingComplete()
+    onProcessingProgress && onProcessingProgress(0)
     
     try {
       console.log('🌐 [FRONTEND] Calling CatBoost API...')
+      onProcessingProgress && onProcessingProgress(1)
       // Call the real CatBoost API
       const result = await callCatBoostAPI(file)
       console.log('✅ [FRONTEND] API call completed successfully')
-      
-      setUploadSteps((s) => s.map((st) => (st.id === "upload" ? { ...st, status: "completed", message: "File uploaded" } : st)))
-
-      console.log('🔍 [FRONTEND] Starting validation step...')
-      setUploadSteps((s) => s.map((st) => (st.id === "validate" ? { ...st, status: "processing", message: "Validating file format and columns..." } : st)))
-      await new Promise((r) => setTimeout(r, 500))
-      
-      // Check if DailySalesQty was handled (target variable)
-      const validationMessage = result.data_info?.target_variable_handled 
-        ? "Validation passed (DailySalesQty column detected and handled)" 
-        : "Validation passed"
-      
-      setUploadSteps((s) => s.map((st) => (st.id === "validate" ? { ...st, status: "completed", message: validationMessage } : st)))
-
-      console.log('📊 [FRONTEND] Starting column analysis...')
-      setUploadSteps((s) => s.map((st) => (st.id === "parse" ? { ...st, status: "processing", message: "Analyzing columns..." } : st)))
-      await new Promise((r) => setTimeout(r, 500))
+      onProcessingProgress && onProcessingProgress(2)
       
       // Use actual prediction results for preview
       const previewData = result.predictions?.slice(0, 5) || []
@@ -185,12 +165,6 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
         previewData: previewData as Array<Record<string, unknown>>, 
         validationErrors: [] 
       })
-      setUploadSteps((s) => s.map((st) => (st.id === "parse" ? { ...st, status: "completed", message: `${columns.length} columns detected` } : st)))
-
-      console.log('🎯 [FRONTEND] Preparing final results...')
-      setUploadSteps((s) => s.map((st) => (st.id === "ready" ? { ...st, status: "processing", message: "Preparing results..." } : st)))
-      await new Promise((r) => setTimeout(r, 500))
-      setUploadSteps((s) => s.map((st) => (st.id === "ready" ? { ...st, status: "completed", message: "Ready" } : st)))
 
       // Store the results for the results component
       console.log('💾 [FRONTEND] Storing results in session storage...')
@@ -199,17 +173,21 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
       
       setIsUploading(false)
       console.log('🎉 [FRONTEND] Processing completed successfully')
-      onProcessingComplete()
+      onProcessingProgress && onProcessingProgress(3)
+      onProcessingFinished && onProcessingFinished()
       
     } catch (error) {
       console.error('❌ [FRONTEND] Processing error:', error)
       setUploadError(`Processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
-      setUploadSteps((s) => s.map((st) => ({ ...st, status: "error" as const, message: "Processing failed" })))
       setIsUploading(false)
     }
   }
 
   const handleFileUpload = (file: File) => { 
+    if (!file || file.size === 0) {
+      onProcessingError && onProcessingError('No dataset detected. Please upload a valid CSV file and try again.')
+      return
+    }
     setUploadedFile(file)
     startProcessing(file) 
   }
@@ -218,7 +196,6 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
     setUploadedFile(null)
     setFilePreview(null)
     setUploadError(null)
-    setUploadSteps((prev) => prev.map((s) => ({ ...s, status: "pending" as const, message: undefined }))) 
   }
 
   return (
@@ -280,12 +257,20 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
+      <div className="grid grid-cols-1 gap-8 mb-10">
         <Card>
           <CardHeader>
             <CardTitle>Upload Your Data (CSV/XML)</CardTitle>
           </CardHeader>
           <CardContent>
+            <div className="mb-4">
+              <div className="text-sm text-gray-700 mb-2">Forecast horizon</div>
+              <div className="flex gap-2">
+                <Button type="button" variant={forecastDays === 30 ? "default" : "outline"} onClick={() => setForecastDays(30)} className={forecastDays === 30 ? "bg-[#D96F32] hover:bg-[#C75D2C] text-white" : ""}>30 days</Button>
+                <Button type="button" variant={forecastDays === 90 ? "default" : "outline"} onClick={() => setForecastDays(90)} className={forecastDays === 90 ? "bg-[#D96F32] hover:bg-[#C75D2C] text-white" : ""}>90 days</Button>
+                <Button type="button" variant={forecastDays === 180 ? "default" : "outline"} onClick={() => setForecastDays(180)} className={forecastDays === 180 ? "bg-[#D96F32] hover:bg-[#C75D2C] text-white" : ""}>180 days</Button>
+              </div>
+            </div>
             <FileUploadZone 
               onFileUpload={handleFileUpload} 
               onFileRemove={handleFileRemove} 
@@ -296,14 +281,7 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
             {filePreview && <div className="mt-6"><FilePreview {...filePreview} /></div>}
           </CardContent>
         </Card>
-        <UploadProgress steps={uploadSteps} />
       </div>
-
-      {uploadedFile && isUploading && (
-        <LoaderSpinner 
-          message={`Processing your data... ${uploadedFile.size > 50 * 1024 * 1024 ? 'Large file detected - this may take several minutes.' : ''}`} 
-        />
-      )}
     </>
   )
 }
