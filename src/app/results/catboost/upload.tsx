@@ -139,15 +139,15 @@ export default function Upload({ onProcessingComplete, onProcessingProgress, onP
     setUploadError(null)
     // Immediately show the processing loader screen (no delay)
     onProcessingComplete()
-    onProcessingProgress && onProcessingProgress(0)
+    if (onProcessingProgress) onProcessingProgress(0)
     
     try {
       console.log('🌐 [FRONTEND] Calling CatBoost API...')
-      onProcessingProgress && onProcessingProgress(1)
+      if (onProcessingProgress) onProcessingProgress(1)
       // Call the real CatBoost API
       const result = await callCatBoostAPI(file)
       console.log('✅ [FRONTEND] API call completed successfully')
-      onProcessingProgress && onProcessingProgress(2)
+      if (onProcessingProgress) onProcessingProgress(2)
       
       // Use actual prediction results for preview
       const previewData = result.predictions?.slice(0, 5) || []
@@ -155,6 +155,15 @@ export default function Upload({ onProcessingComplete, onProcessingProgress, onP
       
       console.log(`📊 [FRONTEND] Preview data: ${previewData.length} rows, ${columns.length} columns`)
       console.log(`📊 [FRONTEND] Columns: ${columns.join(', ')}`)
+      console.log(`📊 [FRONTEND] Total predictions: ${result.predictions?.length || 0}`)
+      
+      // Log unique stores and products for debugging
+      if (result.predictions && result.predictions.length > 0) {
+        const uniqueStores = [...new Set(result.predictions.map((p: { StoreID: string }) => p.StoreID))].sort()
+        const uniqueProducts = [...new Set(result.predictions.map((p: { ProductID: string }) => p.ProductID))].sort()
+        console.log(`🏪 [FRONTEND] Unique stores: ${uniqueStores.length} - ${uniqueStores.join(', ')}`)
+        console.log(`📦 [FRONTEND] Unique products: ${uniqueProducts.length} - ${uniqueProducts.join(', ')}`)
+      }
       
       setFilePreview({ 
         fileName: file.name, 
@@ -168,13 +177,28 @@ export default function Upload({ onProcessingComplete, onProcessingProgress, onP
 
       // Store the results for the results component
       console.log('💾 [FRONTEND] Storing results in session storage...')
+      
+      // Also store the original CSV data for product-specific forecasting
+      try {
+        const csvText = await file.text()
+        const originalCsvData = {
+          content: csvText,
+          fileName: file.name,
+          size: file.size
+        }
+        sessionStorage.setItem('catboost_original_data', JSON.stringify(originalCsvData))
+        console.log('💾 [FRONTEND] Original CSV data stored for product-specific forecasting')
+      } catch (error) {
+        console.warn('⚠️ [FRONTEND] Could not store original CSV data:', error)
+      }
+      
       sessionStorage.setItem('catboost_results', JSON.stringify(result))
       console.log('✅ [FRONTEND] Results stored successfully')
       
       setIsUploading(false)
       console.log('🎉 [FRONTEND] Processing completed successfully')
-      onProcessingProgress && onProcessingProgress(3)
-      onProcessingFinished && onProcessingFinished()
+      if (onProcessingProgress) onProcessingProgress(3)
+      if (onProcessingFinished) onProcessingFinished()
       
     } catch (error) {
       console.error('❌ [FRONTEND] Processing error:', error)
@@ -185,7 +209,7 @@ export default function Upload({ onProcessingComplete, onProcessingProgress, onP
 
   const handleFileUpload = (file: File) => { 
     if (!file || file.size === 0) {
-      onProcessingError && onProcessingError('No dataset detected. Please upload a valid CSV file and try again.')
+      if (onProcessingError) onProcessingError('No dataset detected. Please upload a valid CSV file and try again.')
       return
     }
     setUploadedFile(file)

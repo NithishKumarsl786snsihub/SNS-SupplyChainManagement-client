@@ -273,6 +273,45 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
     setTimeout(() => setIsDownloaded(false), 2000)
   }
 
+  // Use our hosted sample CSV from Cloudinary
+  const handleUseOurData = async () => {
+    try {
+      setUploadError(null)
+      setIsUploading(true)
+      setUploadSteps((s) => s.map((st) => (st.id === "upload" ? { ...st, status: "processing", message: "Fetching sample CSV..." } : st)))
+
+      const url = "https://res.cloudinary.com/dka0p2eln/raw/upload/v1759838223/xgboost_sample_input_bwigwy.csv"
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 120000)
+      const resp = await fetch(url, { signal: controller.signal })
+      clearTimeout(timeoutId)
+      if (!resp.ok) {
+        throw new Error(`Failed to download sample CSV (${resp.status})`)
+      }
+      const blob = await resp.blob()
+      const file = new File([blob], "xgboost_sample_input.csv", { type: "text/csv" })
+
+      // Early header validation like manual upload
+      const validation = await validateCsvHeaders(file)
+      if (!validation.ok) {
+        setUploadSteps((s) => s.map((st) => (st.id === "validate" ? { ...st, status: "error", message: validation.error } : st)))
+        setIsUploading(false)
+        setUploadError(validation.error ?? "Invalid CSV headers")
+        return
+      }
+
+      // Set as the uploaded file and continue the normal flow
+      setUploadedFile(file)
+      setUploadSteps((s) => s.map((st) => (st.id === "validate" ? { ...st, status: "completed", message: "Headers verified" } : st)))
+      await startProcessing(file)
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to fetch sample CSV"
+      setUploadError(msg)
+      setUploadSteps((s) => s.map((st) => (st.id === "upload" ? { ...st, status: "error", message: msg } : st)))
+      setIsUploading(false)
+    }
+  }
+
   const validateCsvHeaders = async (file: File): Promise<{ ok: boolean; error?: string }> => {
     try {
       const text = await file.text()
@@ -504,6 +543,11 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
             <CardTitle>Upload Your Data (CSV/XML)</CardTitle>
           </CardHeader>
           <CardContent>
+            <div className="flex items-center justify-between mb-4 gap-3">
+              <Button onClick={handleUseOurData} variant="outline" className="border-sns-orange text-sns-orange hover:bg-sns-orange/10">
+                Use our data
+              </Button>
+            </div>
             <FileUploadZone 
               onFileUpload={handleFileUpload} 
               onFileRemove={handleFileRemove} 
