@@ -20,6 +20,7 @@ export interface ModelInfo {
   exog_features?: string[];
   aic?: number;
   bic?: number;
+  llf?: number;
 }
 
 export interface PredictionResponse {
