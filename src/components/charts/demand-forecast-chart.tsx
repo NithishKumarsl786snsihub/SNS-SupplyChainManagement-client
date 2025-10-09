@@ -191,14 +191,14 @@ export default function DemandForecastChart({ data, title = "Demand Forecast vs 
               
               {/* Confidence Interval Area */}
               <Area
-                type="monotone"
+                type="linear"
                 dataKey="confidence_upper"
                 stroke="none"
                 fill="url(#confidenceGradient)"
                 fillOpacity={0.3}
               />
               <Area
-                type="monotone"
+                type="linear"
                 dataKey="confidence_lower"
                 stroke="none"
                 fill="white"
@@ -207,7 +207,7 @@ export default function DemandForecastChart({ data, title = "Demand Forecast vs 
               
               {/* Prediction Line */}
               <Line
-                type="monotone"
+                type="linear"
                 dataKey="predicted"
                 stroke="#10B981"
                 strokeWidth={3}

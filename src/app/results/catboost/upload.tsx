@@ -287,14 +287,6 @@ export default function Upload({ onProcessingComplete, onProcessingProgress, onP
             <CardTitle>Upload Your Data (CSV/XML)</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="mb-4">
-              <div className="text-sm text-gray-700 mb-2">Forecast horizon</div>
-              <div className="flex gap-2">
-                <Button type="button" variant={forecastDays === 30 ? "default" : "outline"} onClick={() => setForecastDays(30)} className={forecastDays === 30 ? "bg-[#D96F32] hover:bg-[#C75D2C] text-white" : ""}>30 days</Button>
-                <Button type="button" variant={forecastDays === 90 ? "default" : "outline"} onClick={() => setForecastDays(90)} className={forecastDays === 90 ? "bg-[#D96F32] hover:bg-[#C75D2C] text-white" : ""}>90 days</Button>
-                <Button type="button" variant={forecastDays === 180 ? "default" : "outline"} onClick={() => setForecastDays(180)} className={forecastDays === 180 ? "bg-[#D96F32] hover:bg-[#C75D2C] text-white" : ""}>180 days</Button>
-              </div>
-            </div>
             <FileUploadZone 
               onFileUpload={handleFileUpload} 
               onFileRemove={handleFileRemove} 

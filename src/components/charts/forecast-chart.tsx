@@ -81,7 +81,7 @@ export function ForecastChart({ data, title = "Forecast vs Actual" }: ForecastCh
               <Legend />
               {data.some((d) => d.actual !== undefined) && (
                 <Line
-                  type="monotone"
+                  type="linear"
                   dataKey="actual"
                   stroke="#6b7280"
                   strokeWidth={2}
@@ -91,7 +91,7 @@ export function ForecastChart({ data, title = "Forecast vs Actual" }: ForecastCh
                 />
               )}
               <Line
-                type="monotone"
+                type="linear"
                 dataKey="predicted"
                 stroke="#D96F32"
                 strokeWidth={2}
@@ -102,7 +102,7 @@ export function ForecastChart({ data, title = "Forecast vs Actual" }: ForecastCh
               {data.some((d) => d.confidence_upper !== undefined) && (
                 <>
                   <Line
-                    type="monotone"
+                    type="linear"
                     dataKey="confidence_upper"
                     stroke="#10b981"
                     strokeWidth={2}
@@ -112,7 +112,7 @@ export function ForecastChart({ data, title = "Forecast vs Actual" }: ForecastCh
                     name="Upper Confidence"
                   />
                   <Line
-                    type="monotone"
+                    type="linear"
                     dataKey="confidence_lower"
                     stroke="#ef4444"
                     strokeWidth={2}

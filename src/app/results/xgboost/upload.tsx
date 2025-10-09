@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState } from "react"
@@ -5,10 +6,8 @@ import { Download, FileText, CheckCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { FileUploadZone } from "@/components/file-upload-zone"
-import { UploadProgress } from "@/components/upload-progress"
-import { FilePreview } from "@/components/file-preview"
-import { DataTable } from "@/components/data-table"
 import LoaderSpinner from "@/components/ui/loader"
+import { DataTable } from "@/components/data-table"
 
 interface UploadStep { 
   id: string
@@ -17,15 +16,7 @@ interface UploadStep {
   message?: string 
 }
 
-interface FilePreviewState { 
-  fileName: string
-  fileSize: number
-  rowCount: number
-  columnCount: number
-  columns: string[]
-  previewData: Array<Record<string, unknown>>
-  validationErrors: string[] 
-}
+// (Preview suppressed during upload; table preview still available for sample dataset)
 
 type XGBPredictionRow = {
   StoreID: string
@@ -54,7 +45,7 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
     { id: "parse", label: "Column Analysis", status: "pending" },
     { id: "ready", label: "Ready for Results", status: "pending" },
   ])
-  const [filePreview, setFilePreview] = useState<FilePreviewState | null>(null)
+  // Preview state removed per spec (show UploadProgress instead)
 
   // Required headers (exact match) based on backend sample_input.csv
   const requiredHeaders = [
@@ -133,126 +124,6 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
       Precipitation: 4,
       MedianIncome: 39225,
       CompetitorStoresNearby: 18,
-    },
-    {
-      Date: "2024-03-01",
-      StoreID: "S001",
-      ProductID: "P001",
-      ProductName: "T-Shirt Basic",
-      Category: "T-Shirt",
-      SubCategory: "Basic",
-      City: "Bhubaneswar",
-      Region: "East",
-      Price: 1772,
-      DiscountPct: 5,
-      PromotionFlag: 0,
-      CompetitionPrice: 2092,
-      Season: "Spring",
-      HolidayFlag: 0,
-      HolidayName: "",
-      AdSpend: 2736,
-      UnemploymentRate: 6.847477034017266,
-      Inflation: 5.745930078837414,
-      Temperature: 21.887351306780293,
-      Precipitation: 24,
-      MedianIncome: 41571,
-      CompetitorStoresNearby: 6,
-    },
-    {
-      Date: "2024-04-01",
-      StoreID: "S001",
-      ProductID: "P001",
-      ProductName: "T-Shirt Basic",
-      Category: "T-Shirt",
-      SubCategory: "Basic",
-      City: "Bhubaneswar",
-      Region: "East",
-      Price: 852,
-      DiscountPct: 3,
-      PromotionFlag: 0,
-      CompetitionPrice: 853,
-      Season: "Spring",
-      HolidayFlag: 0,
-      HolidayName: "",
-      AdSpend: 3578,
-      UnemploymentRate: 6.971297137461472,
-      Inflation: 5.137490084204322,
-      Temperature: 23.57806256059253,
-      Precipitation: 25,
-      MedianIncome: 41368,
-      CompetitorStoresNearby: 13,
-    },
-    {
-      Date: "2024-05-01",
-      StoreID: "S001",
-      ProductID: "P001",
-      ProductName: "T-Shirt Basic",
-      Category: "T-Shirt",
-      SubCategory: "Basic",
-      City: "Bhubaneswar",
-      Region: "East",
-      Price: 713,
-      DiscountPct: 13,
-      PromotionFlag: 1,
-      CompetitionPrice: 1427,
-      Season: "Spring",
-      HolidayFlag: 0,
-      HolidayName: "NewYear",
-      AdSpend: 158,
-      UnemploymentRate: 6.57111464002144,
-      Inflation: 5.787379977222721,
-      Temperature: 15.76789696561495,
-      Precipitation: 38,
-      MedianIncome: 38965,
-      CompetitorStoresNearby: 8,
-    },
-    {
-      Date: "2024-06-01",
-      StoreID: "S001",
-      ProductID: "P001",
-      ProductName: "T-Shirt Basic",
-      Category: "T-Shirt",
-      SubCategory: "Basic",
-      City: "Bhubaneswar",
-      Region: "East",
-      Price: 837,
-      DiscountPct: 11,
-      PromotionFlag: 0,
-      CompetitionPrice: 849,
-      Season: "Summer",
-      HolidayFlag: 0,
-      HolidayName: "",
-      AdSpend: 4671,
-      UnemploymentRate: 6.729315457231535,
-      Inflation: 5.269760244202389,
-      Temperature: 15.660778760512423,
-      Precipitation: 39,
-      MedianIncome: 39237,
-      CompetitorStoresNearby: 4,
-    },
-    {
-      Date: "2024-07-01",
-      StoreID: "S001",
-      ProductID: "P001",
-      ProductName: "T-Shirt Basic",
-      Category: "T-Shirt",
-      SubCategory: "Basic",
-      City: "Bhubaneswar",
-      Region: "East",
-      Price: 717,
-      DiscountPct: 7,
-      PromotionFlag: 0,
-      CompetitionPrice: 1227,
-      Season: "Summer",
-      HolidayFlag: 0,
-      HolidayName: "NewYear",
-      AdSpend: 3001,
-      UnemploymentRate: 6.013909130249806,
-      Inflation: 5.842085418357616,
-      Temperature: 29.483405209512213,
-      Precipitation: 11,
-      MedianIncome: 38569,
-      CompetitorStoresNearby: 8,
     },
   ]
 
@@ -334,7 +205,7 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
         return { ok: false, error: "Column order must exactly match the template sample." }
       }
       return { ok: true }
-    } catch (e) {
+    } catch {
       return { ok: false, error: "Unable to read the CSV file for validation." }
     }
   }
@@ -381,17 +252,7 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
     setUploadSteps((s) => s.map((st) => (st.id === "validate" ? { ...st, status: "completed", message: "Validation passed" } : st)))
 
     setUploadSteps((s) => s.map((st) => (st.id === "parse" ? { ...st, status: "processing", message: "Analyzing response..." } : st)))
-    const firstFew = (apiResponse?.predictions || []).slice(0, 3)
-    const columns = ["StoreID", "ProductID", "Date", "PredictedMonthlyDemand"]
-    setFilePreview({
-      fileName: file.name,
-      fileSize: file.size,
-      rowCount: apiResponse?.count || 0,
-      columnCount: columns.length,
-      columns,
-      previewData: firstFew as Array<Record<string, unknown>>,
-      validationErrors: [],
-    })
+    // skip file preview; rely on progress component
     setUploadSteps((s) => s.map((st) => (st.id === "parse" ? { ...st, status: "completed", message: `${apiResponse?.count || 0} predictions` } : st)))
 
     setUploadSteps((s) => s.map((st) => (st.id === "ready" ? { ...st, status: "processing", message: "Preparing results..." } : st)))
@@ -399,8 +260,8 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
     setUploadSteps((s) => s.map((st) => (st.id === "ready" ? { ...st, status: "completed", message: "Ready" } : st)))
 
     // Build (StoreID, ProductID) -> Category map and full context map from the uploaded CSV on the client
-    let categoryMap: Record<string, string> = {}
-    let contextMap: Record<string, Record<string, unknown>> = {}
+    const categoryMap: Record<string, string> = {}
+    const contextMap: Record<string, Record<string, unknown>> = {}
     try {
       const text = await file.text()
       const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0)
@@ -468,7 +329,6 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
 
   const handleFileRemove = () => { 
     setUploadedFile(null)
-    setFilePreview(null)
     setUploadError(null)
     setUploadSteps((prev) => prev.map((s) => ({ ...s, status: "pending" as const, message: undefined }))) 
   }
@@ -498,19 +358,24 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
                   <p className="text-sm text-gray-600">{getSampleData().length} records • {Object.keys(getSampleData()[0]).length} columns</p>
               </div>
             </div>
-            <Button onClick={handleDownload} className="bg-[#D96F32] hover:bg-[#C75D2C] text-white" disabled={isDownloaded}>
-              {isDownloaded ? (
-                <>
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Downloaded
-                </>
-              ) : (
-                <>
-                  <Download className="h-4 w-4 mr-2" />
-                  Download CSV
-                </>
-              )}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button onClick={handleUseOurData} variant="outline" className="border-sns-orange text-sns-orange hover:bg-sns-orange/10">
+                Use our data
+              </Button>
+              <Button onClick={handleDownload} className="bg-[#D96F32] hover:bg-[#C75D2C] text-white" disabled={isDownloaded}>
+                {isDownloaded ? (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Downloaded
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4 mr-2" />
+                    Download CSV
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
 
           <div className="text-sm text-gray-600 space-y-2">
@@ -532,22 +397,12 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
         </CardContent>
       </Card>
 
-      <div className="mt-8 mb-4">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Upload Your Data</h2>
-        <p className="text-gray-600">Upload your CSV file containing supply chain data. We&apos;ll validate the format and prepare it for forecasting with your selected XGBoost model.</p>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
+      <div className="grid grid-cols-1 gap-8 mb-10">
         <Card>
           <CardHeader>
             <CardTitle>Upload Your Data (CSV/XML)</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between mb-4 gap-3">
-              <Button onClick={handleUseOurData} variant="outline" className="border-sns-orange text-sns-orange hover:bg-sns-orange/10">
-                Use our data
-              </Button>
-            </div>
             <FileUploadZone 
               onFileUpload={handleFileUpload} 
               onFileRemove={handleFileRemove} 
@@ -555,13 +410,20 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
               isUploading={isUploading} 
               uploadError={uploadError} 
             />
-            {filePreview && <div className="mt-6"><FilePreview {...filePreview} /></div>}
+            {isUploading && (
+              <LoaderSpinner 
+                fullscreen
+                showStepper 
+                message="Processing your data..." 
+                steps={uploadSteps.map(s => s.label)}
+                step={uploadSteps.findIndex(s => s.status === "processing")}
+                size="md"
+                background="#fdfaf6"
+              />
+            )}
           </CardContent>
         </Card>
-        <UploadProgress steps={uploadSteps} />
       </div>
-
-      {uploadedFile && isUploading && <LoaderSpinner message="Processing your data..." />}
     </>
   )
 }
