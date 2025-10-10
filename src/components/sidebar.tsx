@@ -5,14 +5,14 @@ import { usePathname } from "next/navigation"
 
 const items = [
   { name: "XGBoost", slug: "xgboost" },
-  { name: "LightGBM", slug: "lightgbm" },
   { name: "CatBoost", slug: "catboost" },
+  { name: "LightGBM", slug: "lightgbm" },
   { name: "Linear Regression", slug: "linear-regression" },
+  { name: "Prophet", slug: "prophet" },
   { name: "ARIMA", slug: "arima" },
+  { name: "ARIMAX", slug: "arimax" },
   { name: "SARIMA", slug: "sarima" },
   { name: "SARIMAX", slug: "sarimax" },
-  { name: "ARIMAX", slug: "arimax" },
-  { name: "Prophet", slug: "prophet" },
   { name: "VARIMA", slug: "varima" },
 ]
 
