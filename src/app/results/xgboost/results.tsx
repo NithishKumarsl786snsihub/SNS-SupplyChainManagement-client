@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { ForecastChart } from "@/components/charts/forecast-chart"
 import { BreadcrumbNav } from "@/components/breadcrumb-nav"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts"
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceDot, Legend } from "recharts"
 import { useMemo, useState, useEffect } from "react"
 
 type PredictionRow = {
@@ -55,6 +55,19 @@ export default function Results({ onRunAnotherModel, predictions, categoryMap, c
   const [demandMetrics, setDemandMetrics] = useState<DemandMetrics | null>(null)
   const [metricsLoading, setMetricsLoading] = useState<boolean>(false)
   const [activeTab, setActiveTab] = useState<'demand' | 'pricing'>('demand')
+  const [optimizerLoading, setOptimizerLoading] = useState<boolean>(false)
+  const [optimizerResult, setOptimizerResult] = useState<null | {
+    curve: { price: number; predicted_demand: number; revenue: number; profit: number; profit_margin: number }[]
+    optimal: { price: number; predicted_demand: number; revenue: number; profit: number; profit_margin: number }
+    elasticity: number
+    base_price: number
+  }>(null)
+  const [optimizerError, setOptimizerError] = useState<string>("")
+
+  const optimizerCurveSorted = useMemo(() => {
+    if (!optimizerResult?.curve) return [] as { price: number; predicted_demand: number; revenue: number; profit: number; profit_margin: number }[]
+    return [...optimizerResult.curve].sort((a, b) => a.price - b.price)
+  }, [optimizerResult])
 
   // Compute store -> products mapping and counts
   const storeToProducts = useMemo(() => {
@@ -243,6 +256,78 @@ export default function Results({ onRunAnotherModel, predictions, categoryMap, c
       void loadPriceTimeSeries()
     }
   }, [selectedStore, selectedProduct, contextMap])
+
+  // Run XGBoost price optimizer for selected month
+  const runOptimizer = async () => {
+    if (!selectedStore || !selectedProduct || !selectedMonth) return
+    const ctxKey = `${selectedStore}::${selectedProduct}::${selectedMonth}`
+    let context = (contextMap && (contextMap as any)[ctxKey]) as Record<string, unknown> | undefined
+    if (!context) {
+      // Fallback: try to find an entry for same store/product and month (ignoring day or tz differences)
+      const prefix = `${selectedStore}::${selectedProduct}::`
+      const targetYm = selectedMonth.slice(0, 7)
+      for (const [key, value] of Object.entries(contextMap || {})) {
+        if (key.startsWith(prefix)) {
+          const datePart = key.substring(prefix.length)
+          const ym = datePart.slice(0, 7)
+          if (ym === targetYm) {
+            context = value as Record<string, unknown>
+            break
+          }
+        }
+      }
+      // As a last resort, pick the first available for the store/product
+      if (!context) {
+        for (const [key, value] of Object.entries(contextMap || {})) {
+          if (key.startsWith(prefix)) {
+            context = value as Record<string, unknown>
+            break
+          }
+        }
+      }
+      if (!context) {
+        setOptimizerError("No context rows found for the selected month. Try another month.")
+        return
+      }
+    }
+    try {
+      setOptimizerLoading(true)
+      setOptimizerResult(null)
+      setOptimizerError("")
+      const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000"
+      const payload = {
+        StoreID: selectedStore,
+        ProductID: selectedProduct,
+        Date: selectedMonth,
+        context,
+        grid_points: 41,
+        sweep_pct: 0.30,
+      }
+      const resp = await fetch(`${base}/api/m1/price-optimizer/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+      if (!resp.ok) {
+        setOptimizerResult(null)
+        const err = await resp.json().catch(() => ({} as any))
+        setOptimizerError(err?.error || "Optimizer request failed")
+        return
+      }
+      const data = await resp.json()
+      setOptimizerResult({
+        curve: data.curve || [],
+        optimal: data.optimal,
+        elasticity: data.elasticity,
+        base_price: data.base_price,
+      })
+    } catch (e) {
+      setOptimizerResult(null)
+      setOptimizerError("Failed to compute optimal price. Check server logs.")
+    } finally {
+      setOptimizerLoading(false)
+    }
+  }
 
 
   return (
@@ -876,11 +961,24 @@ export default function Results({ onRunAnotherModel, predictions, categoryMap, c
                       dot={{ r: 4 }} 
                       connectNulls 
                     />
+                    {/* Draw per-month optimal price if returned */}
+                    {priceTimeSeries.some((it) => typeof (it as any).optimal_price === 'number') && (
+                      <Line 
+                        type="linear"
+                        dataKey="optimal_price"
+                        name="Optimal Price"
+                        stroke="#3b82f6"
+                        strokeWidth={2}
+                        strokeDasharray="6 4"
+                        dot={{ r: 2 }}
+                        connectNulls
+                      />
+                    )}
                     <Line 
                       type="linear" 
                       dataKey="upper_bound" 
                       name="Upper Bound" 
-                      stroke="#ef4444" 
+                      stroke="#22c55e" 
                       strokeWidth={2} 
                       strokeDasharray="5 5"
                       dot={{ r: 2 }} 
@@ -890,7 +988,7 @@ export default function Results({ onRunAnotherModel, predictions, categoryMap, c
                       type="linear" 
                       dataKey="lower_bound" 
                       name="Lower Bound" 
-                      stroke="#22c55e" 
+                      stroke="#ef4444" 
                       strokeWidth={2} 
                       strokeDasharray="5 5"
                       dot={{ r: 2 }} 
@@ -931,6 +1029,8 @@ export default function Results({ onRunAnotherModel, predictions, categoryMap, c
                       </p>
                     </div>
                   )}
+
+                  {/* Elasticity and Optimal Price graph removed as requested */}
                 </div>
 
                 {/* Pricing Insights - 30% width */}
@@ -1029,7 +1129,7 @@ export default function Results({ onRunAnotherModel, predictions, categoryMap, c
                 <div className="bg-white rounded-xl border border-gray-200 shadow-lg overflow-hidden">
                   {/* Enhanced Table Header */}
                   <div className="bg-gradient-to-r from-sns-orange via-orange-500 to-orange-600 px-4 py-3">
-                    <div className="grid grid-cols-5 gap-3 text-white font-semibold text-xs">
+                    <div className="grid grid-cols-6 gap-3 text-white font-semibold text-xs">
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 bg-white rounded-full"></div>
                         Month
@@ -1045,6 +1145,10 @@ export default function Results({ onRunAnotherModel, predictions, categoryMap, c
                       <div className="text-right flex items-center justify-end gap-2">
                         <div className="w-2 h-2 bg-white rounded-full"></div>
                         Lower Bound
+                      </div>
+                      <div className="text-right flex items-center justify-end gap-2">
+                        <div className="w-2 h-2 bg-white rounded-full"></div>
+                        Optimal Price
                       </div>
                       <div className="text-right flex items-center justify-end gap-2">
                         <div className="w-2 h-2 bg-white rounded-full"></div>
@@ -1069,7 +1173,7 @@ export default function Results({ onRunAnotherModel, predictions, categoryMap, c
                           const demand = demandByMonth.get(row.month) || 0
                           return (
                             <div key={row.month} 
-                                 className="grid grid-cols-5 gap-3 px-4 py-3 hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-indigo-50/30 transition-all duration-200">
+                                 className="grid grid-cols-6 gap-3 px-4 py-3 hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-indigo-50/30 transition-all duration-200">
                               {/* Month */}
                               <div className="flex items-center">
                                 <div className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
@@ -1082,11 +1186,15 @@ export default function Results({ onRunAnotherModel, predictions, categoryMap, c
                               </div>
                               {/* Upper Bound */}
                               <div className="text-right">
-                                <div className="text-sm text-red-700">₹{row.upper_bound.toFixed(2)}</div>
+                                <div className="text-sm text-green-700">₹{row.upper_bound.toFixed(2)}</div>
                               </div>
                               {/* Lower Bound */}
                               <div className="text-right">
-                                <div className="text-sm text-green-700">₹{row.lower_bound.toFixed(2)}</div>
+                                <div className="text-sm text-red-700">₹{row.lower_bound.toFixed(2)}</div>
+                              </div>
+                              {/* Optimal Price */}
+                              <div className="text-right">
+                                <div className="text-sm font-semibold text-sns-orange">₹{(row as any).optimal_price?.toFixed ? (row as any).optimal_price.toFixed(2) : (typeof (row as any).optimal_price === 'number' ? (row as any).optimal_price.toFixed(2) : '—')}</div>
                               </div>
                               {/* Predicted Demand */}
                               <div className="text-right">
