@@ -125,6 +125,39 @@ export default function Results({ onRunAnotherModel }: ResultsProps) {
     setYDomain([0, 0])
   }
 
+  const getCurrentCategoryLabel = (): string => {
+    if (!selected.store || !selected.product) return ''
+    try {
+      const originalData = sessionStorage.getItem('catboost_original_data')
+      if (originalData) {
+        const parsed = JSON.parse(originalData)
+        const csvText: string = parsed.content
+        const lines = csvText.split('\n')
+        const headers = lines[0]?.split(',').map((h: string) => h.trim()) || []
+        for (let i = lines.length - 1; i >= 1; i--) {
+          const values = lines[i].split(',').map((v: string) => v.trim())
+          if (values.length >= headers.length) {
+            const row: Record<string, string> = {}
+            headers.forEach((header: string, index: number) => {
+              row[header] = values[index] || ''
+            })
+            if (row.StoreID === selected.store && row.ProductID === selected.product) {
+              return row.Category || row.SubCategory || ''
+            }
+          }
+        }
+      }
+    } catch {}
+    // Fallback: infer from predictions
+    const productData = results?.predictions?.filter(p => p.StoreID === selected.store && p.ProductID === selected.product) || []
+    if (productData.length > 0) {
+      const avgSales = productData.reduce((sum, p) => sum + p.PredictedDailySales, 0) / productData.length
+      const maxSales = Math.max(...productData.map(p => p.PredictedDailySales))
+      return avgSales > maxSales * 0.8 ? 'Premium' : 'Standard'
+    }
+    return ''
+  }
+
   const generateCombinedAnalysis = async () => {
     if (!selected.store || !selected.product || !results?.predictions) return
     
@@ -403,12 +436,13 @@ export default function Results({ onRunAnotherModel }: ResultsProps) {
         lastPrediction: data.result?.forecast?.[data.result?.forecast?.length - 1]?.prediction
       })
       
-      const series = (data.result?.forecast || []).map((f: { date: string; prediction: number; upper_bound?: number; lower_bound?: number; confidence?: number }) => ({
+      const series = (data.result?.forecast || []).map((f: { date: string; prediction: number; upper_bound?: number; lower_bound?: number; confidence?: number; variation?: number }) => ({
         date: f.date,
         prediction: Number(f.prediction),
         upperBound: typeof f.upper_bound === 'number' ? Number(f.upper_bound) : Number(f.prediction) * 1.2,
         lowerBound: typeof f.lower_bound === 'number' ? Number(f.lower_bound) : Math.max(0, Number(f.prediction) * 0.8),
-        confidence: typeof f.confidence === 'number' ? Number(f.confidence) : undefined
+        confidence: typeof f.confidence === 'number' ? Number(f.confidence) : undefined,
+        variation: typeof f.variation === 'number' ? Number(f.variation) : undefined
       }))
       
       console.log(`📈 [FORECAST] Generated ${series.length} UNIQUE forecast points for ${selected.store}/${selected.product}`)
@@ -676,32 +710,52 @@ export default function Results({ onRunAnotherModel }: ResultsProps) {
                         <table className="w-full text-left">
                         <thead>
                             <tr className="text-white font-bold bg-orange-500">
+                              <th className="py-4 px-6 text-center">Category</th>
                               <th className="py-4 px-6 text-center">Date</th>
                               <th className="py-4 px-6 text-center">Predicted Sales</th>
+                              <th className="py-4 px-6 text-center">Variation</th>
                               <th className="py-4 px-6 text-center">Confidence</th>
                               <th className="py-4 px-6 text-center">Lower Bound</th>
                               <th className="py-4 px-6 text-center">Upper Bound</th>
                           </tr>
                         </thead>
                         <tbody>
-                            {forecastSeries.map((f: { date: string; prediction: number; lowerBound: number; upperBound: number; confidence?: number }, index: number) => {
-                            const lower = f.lowerBound
-                            const upper = f.upperBound
-                            return (
+                            {forecastSeries.map((f: { date: string; prediction: number; lowerBound: number; upperBound: number; confidence?: number; variation?: number }, index: number) => {
+                              const lower = f.lowerBound
+                              const upper = f.upperBound
+                              const category = getCurrentCategoryLabel()
+                              const variation = (() => {
+                                if (index === 0) return 0
+                                if (typeof f.variation === 'number') return Math.round(f.variation * 10) / 10
+                                const prev = forecastSeries[index - 1].prediction
+                                return Math.round((f.prediction - prev) * 10) / 10
+                              })()
+                              return (
                                 <tr 
                                   key={f.date} 
                                   className={`border-b border-blue-100 transition-colors duration-200 hover:bg-blue-50 ${
                                     index % 2 === 0 ? 'bg-white' : 'bg-slate-50'
                                   }`}
                                 >
+                                  <td className="py-3 px-6">
+                                    <div className="flex items-center justify-center">
+                                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                                        <span className="text-sm font-semibold text-blue-600">{(category || selected.product || 'C').toString().charAt(0).toUpperCase()}</span>
+                                      </div>
+                                      <span className="font-medium text-slate-800">{category || selected.product || '-'}</span>
+                                    </div>
+                                  </td>
                                   <td className="py-3 px-6 text-center font-semibold text-slate-700">{f.date}</td>
                                   <td className="py-3 px-6 text-center font-bold text-blue-600">{f.prediction.toFixed(2)}</td>
+                                  <td className={`py-3 px-6 text-center font-semibold ${variation === 0 ? 'text-slate-700' : variation > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    {variation === 0 ? '0.0' : variation > 0 ? `+${variation.toFixed(1)}` : variation.toFixed(1)}
+                                  </td>
                                   <td className="py-3 px-6 text-center font-semibold text-slate-700">{f.confidence ? (f.confidence * 100).toFixed(1)+'%' : '-'}</td>
                                   <td className="py-3 px-6 text-center font-semibold text-red-600">{lower.toFixed(2)}</td>
                                   <td className="py-3 px-6 text-center font-semibold text-green-600">{upper.toFixed(2)}</td>
-                              </tr>
-                            )
-                          })}
+                                </tr>
+                              )
+                            })}
                         </tbody>
                       </table>
                       </div>
