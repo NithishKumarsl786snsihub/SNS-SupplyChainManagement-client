@@ -8,23 +8,26 @@ import { Button } from '@/components/ui/button'
 import { FileText, Download, CheckCircle } from 'lucide-react'
 import { FileUploadZone } from '@/components/file-upload-zone'
 import { DataTable } from '@/components/data-table'
-import { UploadProgress } from '@/components/upload-progress'
-
-type PreviewRow = { row: string[] }
+import LoaderSpinner from '@/components/ui/loader'
 
 interface UploadProps {
   onProcessingComplete: (datasetInfo: DatasetInfo) => void
+}
+
+interface UploadStep { 
+  id: string
+  label: string
+  status: "pending" | "processing" | "completed" | "error"
+  message?: string 
 }
 
 export default function Upload({ onProcessingComplete }: UploadProps) {
   const [uploading, setUploading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
   const [datasetInfo, setDatasetInfo] = useState<DatasetInfo | null>(null)
-  const [datasetPreview, setDatasetPreview] = useState<PreviewRow[]>([])
-  const [showPreview, setShowPreview] = useState<boolean>(false)
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [isDownloaded, setIsDownloaded] = useState(false)
-  const [uploadSteps, setUploadSteps] = useState<Array<{ id: string; label: string; status: 'pending' | 'processing' | 'completed' | 'error'; message?: string }>>([
+  const [uploadSteps, setUploadSteps] = useState<UploadStep[]>([
     { id: 'upload', label: 'File Upload', status: 'pending' },
     { id: 'validate', label: 'Data Validation', status: 'pending' },
     { id: 'parse', label: 'Column Analysis', status: 'pending' },
@@ -88,13 +91,9 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
       const response = await axios.post<UploadResponse>('http://localhost:8000/api/arima/upload-dataset/', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
       setDatasetInfo(response.data.dataset_info)
 
-      // Build preview and metadata directly from the uploaded file to ensure accuracy
+      // Build metadata directly from the uploaded file to ensure accuracy
       const text = await file.text()
       const allLines = text.trim().split(/\r?\n/)
-      const lines = allLines.slice(0, 6)
-      const previewData: PreviewRow[] = lines.map((line) => ({ row: line.split(',') }))
-      setDatasetPreview(previewData)
-      setShowPreview(true)
 
       const headers = allLines[0]?.split(',') ?? []
       const hasRequired = headers.includes('date') && headers.includes('demand')
@@ -115,7 +114,10 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
 
   const startProcessing = async (file: File) => {
     setUploadedFile(file)
+    setUploading(true)
+    setError(null)
     setUploadSteps((s) => s.map((st) => (st.id === 'upload' ? { ...st, status: 'processing', message: 'Uploading file...' } : st)))
+    
     try {
       const meta = await uploadFileToBackend(file)
       setUploadSteps((s) => s.map((st) => (st.id === 'upload' ? { ...st, status: 'completed', message: 'File uploaded' } : st)))
@@ -131,27 +133,30 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
       setUploadSteps((s) => s.map((st) => (st.id === 'ready' ? { ...st, status: 'processing', message: 'Preparing results...' } : st)))
       await new Promise((r) => setTimeout(r, 600))
       setUploadSteps((s) => s.map((st) => (st.id === 'ready' ? { ...st, status: 'completed', message: 'Ready' } : st)))
+      
+      // Complete processing and call the callback
+      setUploading(false)
+      if (datasetInfo) {
+        onProcessingComplete(datasetInfo)
+      }
     } catch {
       setUploadSteps((s) => s.map((st) => (st.id === 'upload' ? { ...st, status: 'error', message: 'Upload failed' } : st)))
+      setUploading(false)
     }
   }
 
-  const handleFileUploadInput = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (file) startProcessing(file)
+  const handleFileUpload = async (file: File) => { 
+    setUploadedFile(file)
+    setError(null)
+    startProcessing(file) 
   }
 
-  const handleFileUploadZone = (file: File) => startProcessing(file)
-  const handleFileRemove = () => {
+  const handleFileRemove = () => { 
     setUploadedFile(null)
     setDatasetInfo(null)
-    setDatasetPreview([])
-    setShowPreview(false)
     setError(null)
-    setUploadSteps((prev) => prev.map((s) => ({ ...s, status: 'pending' as const, message: undefined })))
+    setUploadSteps((prev) => prev.map((s) => ({ ...s, status: 'pending' as const, message: undefined }))) 
   }
-
-  const togglePreview = () => setShowPreview(!showPreview)
 
   return (
     <>
@@ -212,78 +217,32 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
+      <div className="grid grid-cols-1 gap-8 mb-10">
         <Card>
           <CardHeader>
             <CardTitle>Upload Your Data (CSV/XML)</CardTitle>
           </CardHeader>
           <CardContent>
-            {/* Keep a hidden input to allow direct click area upload as well */}
-            <input type="file" accept=".csv" onChange={handleFileUploadInput} className="hidden" id="csv-upload-arima" />
             <FileUploadZone 
-              onFileUpload={handleFileUploadZone}
-              onFileRemove={handleFileRemove}
-              uploadedFile={uploadedFile}
-              isUploading={uploading}
-              uploadError={error}
+              onFileUpload={handleFileUpload} 
+              onFileRemove={handleFileRemove} 
+              uploadedFile={uploadedFile} 
+              isUploading={uploading} 
+              uploadError={error} 
             />
-
-            {datasetInfo && (
-              <div className="mt-6 space-y-4">
-                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <h3 className="font-semibold text-blue-900 mb-2">Dataset Information</h3>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div><span className="text-blue-700">Rows:</span> {datasetInfo.rows}</div>
-                    <div><span className="text-blue-700">Columns:</span> {datasetInfo.columns.length}</div>
-                    <div><span className="text-blue-700">Avg Demand:</span> {datasetInfo.demand_stats?.mean?.toFixed(1) || 'N/A'}</div>
-                    <div><span className="text-blue-700">Std Demand:</span> {datasetInfo.demand_stats?.std?.toFixed(1) || 'N/A'}</div>
-                  </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <Button variant="outline" className="flex-1 border-sns-orange text-sns-orange hover:bg-sns-orange hover:text-white bg-transparent" onClick={togglePreview}>
-                    {showPreview ? 'Hide Dataset Preview' : 'Show Dataset Preview'}
-                  </Button>
-                  <Button disabled={!datasetInfo} className="bg-sns-orange hover:bg-sns-orange-dark text-white" onClick={() => datasetInfo && onProcessingComplete(datasetInfo)}>
-                    Continue
-                  </Button>
-                </div>
-
-                {showPreview && datasetPreview.length > 0 && (
-                  <div className="mt-2 p-4 bg-gray-50 rounded-lg border">
-                    <h4 className="font-semibold text-gray-900 mb-2">Dataset Preview (First 5 rows)</h4>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full bg-white text-sm">
-                        <thead>
-                          <tr className="bg-gray-100">
-                            {datasetPreview[0]?.row.map((header: string, index: number) => (
-                              <th key={index} className="px-4 py-2 text-left font-medium text-gray-700 border">
-                                {header}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {datasetPreview.slice(1).map((row, rowIndex) => (
-                            <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
-                              {row.row.map((cell: string, cellIndex: number) => (
-                                <td key={cellIndex} className="px-4 py-2 border">
-                                  {cell}
-                                </td>
-                              ))}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-              </div>
+            {uploading && (
+              <LoaderSpinner 
+                fullscreen
+                showStepper 
+                message="Processing your data..." 
+                steps={uploadSteps.map(s => s.label)}
+                step={uploadSteps.findIndex(s => s.status === "processing")}
+                size="md"
+                background="#fdfaf6"
+              />
             )}
           </CardContent>
         </Card>
-
-        <UploadProgress steps={uploadSteps} />
       </div>
     </>
   )
