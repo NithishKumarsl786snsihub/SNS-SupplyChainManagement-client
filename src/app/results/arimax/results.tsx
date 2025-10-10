@@ -1,13 +1,18 @@
 "use client"
 
+import { motion } from "framer-motion"
+import { Download, TrendingUp, TrendingDown, BarChart3, Activity, Shield, Target } from "lucide-react"
 import { useEffect, useState } from 'react'
 import axios from 'axios'
 import type { ApiError, DatasetInfo, ModelInfo, PredictionResponse, PriceOptimizationResponse } from '@/types/api'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+// removed unused Card imports
 import { Button } from '@/components/ui/button'
-import LoaderSpinner from '@/components/ui/loader'
 import { ResponsiveContainer, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line, BarChart, Bar } from 'recharts'
 import { BreadcrumbNav } from '@/components/breadcrumb-nav'
+import LoaderSpinner from '@/components/ui/loader'
+import ExportModal from '@/components/ui/export-modal'
+import type { ArimaxExportInput } from '@/lib/exporters/arimaxExport'
+import { exportArimaxToXlsx } from '@/lib/exporters/arimaxExport'
 
 interface ResultsProps {
   datasetInfo: DatasetInfo | null
@@ -40,20 +45,11 @@ interface OptimizationParams {
   steps: number
   include_confidence: boolean
 }
-interface MonthlyAnalysis {
-  month: number
-  price: number
-  predicted_demand: number
-  revenue: number
-  profit: number
-  margin: number
-  elasticity: number
-  confidence_intervals?: {
-    demand_lower: number
-    demand_upper: number
-    profit_lower: number
-    profit_upper: number
-  }
+
+interface ApiModelInfo {
+  aic: number
+  bic?: number
+  llf?: number
 }
 
 // interface OptimizationResult {
@@ -73,7 +69,6 @@ interface MonthlyAnalysis {
 //   }
 // }
 export default function Results({ datasetInfo, onRunAnotherModel }: ResultsProps) {
-  const [training, setTraining] = useState<boolean>(false)
   const [predicting, setPredicting] = useState<boolean>(false)
   const [optimizing, setOptimizing] = useState<boolean>(false)
   const [modelInfo, setModelInfo] = useState<ModelInfo | null>(null)
@@ -84,7 +79,9 @@ export default function Results({ datasetInfo, onRunAnotherModel }: ResultsProps
   const [predictionType, setPredictionType] = useState<'auto' | 'upload'>('auto')
   const [futureFile, setFutureFile] = useState<File | null>(null)
   const [predictionPeriod, setPredictionPeriod] = useState<number>(30) // Default to 30 days
-  const [showDemandTable, setShowDemandTable] = useState<boolean>(true)
+  const [activeTab, setActiveTab] = useState<'demand' | 'pricing'>('demand')
+  // removed unused metrics loading state
+  const [exportOpen, setExportOpen] = useState<boolean>(false)
 
   const [optimizationParams, setOptimizationParams] = useState<OptimizationParams>({
     base_price: 10,
@@ -101,11 +98,10 @@ export default function Results({ datasetInfo, onRunAnotherModel }: ResultsProps
   ]
 
   const trainModel = async (): Promise<void> => {
-    setTraining(true)
     setError('')
 
     try {
-      const response = await axios.post<{ model_info: any }>('http://localhost:8000/api/arimax/train/')
+      const response = await axios.post<{ model_info: ApiModelInfo }>('http://localhost:8000/api/arimax/train/')
       // Transform the API response to match our ModelInfo interface
       const apiModelInfo = response.data.model_info
       const transformedModelInfo: ModelInfo = {
@@ -124,7 +120,7 @@ export default function Results({ datasetInfo, onRunAnotherModel }: ResultsProps
         setError('Training failed')
       }
     } finally {
-      setTraining(false)
+      // no-op
     }
   }
 
@@ -143,7 +139,7 @@ export default function Results({ datasetInfo, onRunAnotherModel }: ResultsProps
       link.click()
       link.remove()
       window.URL.revokeObjectURL(url)
-    } catch (err) {
+    } catch {
       setError('Error downloading template')
     }
   }
@@ -227,7 +223,7 @@ export default function Results({ datasetInfo, onRunAnotherModel }: ResultsProps
     }
   }
 
-  // Auto-run training once the results page loads after upload
+  // Auto-run training and then predictions once the results page loads after upload
   useEffect(() => {
     const run = async () => {
       if (autoRan) return
@@ -235,6 +231,7 @@ export default function Results({ datasetInfo, onRunAnotherModel }: ResultsProps
       setAutoRan(true)
       try {
         await trainModel()
+        await getPredictions(predictionPeriod)
       } catch {
         // errors are handled inside functions
       }
@@ -285,90 +282,119 @@ export default function Results({ datasetInfo, onRunAnotherModel }: ResultsProps
 
   const optimizationChartData: OptimizationChartData[] = optimizationResults?.optimization_results || []
 
-  const isPageLoading = training || predicting || optimizing || (autoRan && !modelInfo)
+  const isPageLoading = !predictions
 
   return (
-    <div className="min-h-screen bg-sns-cream/20 ">
-      {isPageLoading && (
-        <LoaderSpinner 
-          fullscreen 
-          size="md" 
-          message={
-            training ? 'Training ARIMAX model...' : 
-            predicting ? `Generating ${predictionPeriod}-day forecast...` :
-            optimizing ? 'Optimizing pricing strategy...' :
-            'Loading results...'
-          } 
+    <div className="min-h-screen bg-sns-cream/20">
+      {exportOpen && predictions && (
+        <ExportModal<ArimaxExportInput>
+          onClose={() => setExportOpen(false)}
+          title="Export ARIMAX Results"
+          subtitle="Download an Excel file with forecast and pricing analysis."
+          input={{
+            forecast: chartDataSorted.map(d => ({
+              date: d.date,
+              prediction: d.prediction,
+              lower_bound: d.lower_bound ?? null,
+              upper_bound: d.upper_bound ?? null,
+              lower_tight: d.lower_tight ?? null,
+              upper_tight: d.upper_tight ?? null,
+            })),
+            pricing: (optimizationResults?.optimization_results || []).map(r => ({
+              price: r.price,
+              predicted_demand: r.predicted_demand,
+              profit: r.profit,
+              demand_lower: r.confidence_intervals?.demand_lower ?? null,
+              demand_upper: r.confidence_intervals?.demand_upper ?? null,
+              profit_lower: r.confidence_intervals?.profit_lower ?? null,
+              profit_upper: r.confidence_intervals?.profit_upper ?? null,
+            })),
+          }}
+          onExport={exportArimaxToXlsx}
+          buildFilename={() => `arimax_export_${new Date().toISOString().slice(0,10)}.xlsx`}
         />
       )}
-      
+      {isPageLoading && (
+        <LoaderSpinner fullscreen size="md" message={'Processing your data...'} />
+      )}
       <div className="px-4 sm:px-6 lg:px-8 py-8">
         <BreadcrumbNav items={breadcrumbItems} />
 
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">ARIMAX Results</h1>
-            <p className="text-gray-600">Advanced forecasting with external variables and price optimization</p>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">ARIMAX Results</h1>
+              <p className="text-lg text-gray-600 max-w-3xl">Advanced forecasting with external variables and price optimization for high-performance demand prediction.</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                className="border-sns-orange text-sns-orange hover:bg-sns-orange hover:text-white bg-transparent"
+                onClick={() => setExportOpen(true)}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export Results
+              </Button>
+              <Button className="bg-sns-orange hover:bg-sns-orange-dark text-white" onClick={onRunAnotherModel}>
+                Run Another Model
+              </Button>
+            </div>
           </div>
-          <Button className="bg-sns-orange hover:bg-sns-orange-dark text-white" onClick={onRunAnotherModel}>
-            Run Another Model
-          </Button>
+        </motion.div>
+
+        {/* Tab Navigation */}
+        <div className="mb-8">
+          <div className="inline-flex gap-2 border rounded-lg p-1 bg-white shadow-sm">
+            <button
+              className={`px-6 py-3 rounded-lg font-semibold transition-all duration-200 ${
+                activeTab === 'demand' 
+                  ? 'bg-sns-orange text-white shadow-md' 
+                  : 'text-gray-700 hover:text-sns-orange hover:bg-sns-orange/10'
+              }`}
+              onClick={() => setActiveTab('demand')}
+            >
+              <div className="flex items-center gap-2">
+                <Activity className="h-4 w-4" />
+                Demand Forecasting
+              </div>
+            </button>
+            <button
+              className={`px-6 py-3 rounded-lg font-semibold transition-all duration-200 ${
+                activeTab === 'pricing' 
+                  ? 'bg-sns-orange text-white shadow-md' 
+                  : 'text-gray-700 hover:text-sns-orange hover:bg-sns-orange/10'
+              }`}
+              onClick={() => setActiveTab('pricing')}
+            >
+              <div className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4" />
+                Price Analysis
+              </div>
+            </button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-1 gap-6 ">
-          {/* Dataset Info Card */}
-          <div className="xl:col-span-2 space-y-6">
-            {datasetInfo && (
-              <Card className="rounded-2xl border-0 bg-white/70 backdrop-blur ring-1 ring-[#F3E9DC] shadow-[0_10px_30px_rgba(217,111,50,0.06)]">
-                <CardHeader>
-                  <CardTitle>Dataset Information</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div><span className="text-blue-700">Rows:</span> {datasetInfo.rows}</div>
-                    <div><span className="text-blue-700">Columns:</span> {datasetInfo.columns.length}</div>
-                    <div><span className="text-blue-700">Avg Demand:</span> {datasetInfo.demand_stats?.mean?.toFixed(1) || 'N/A'}</div>
-                    <div><span className="text-blue-700">Exogenous Vars:</span> {
-                      datasetInfo.columns.filter(col => 
-                        ['price', 'ads', 'holidays', 'promotions', 'competitor_price', 'weather_index'].includes(col)
-                      ).length || 'None'
-                    }</div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-
-          {/* Model Controls and Results */}
-          <div className="xl:col-span-2 space-y-6">
-            <Card className="bg-white rounded-2xl border-0 ring-1 ring-[#F3E9DC] shadow-[0_10px_30px_rgba(217,111,50,0.06)]">
-              <CardHeader>
-                <CardTitle className="text-md">Model Information</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {modelInfo && (
-                  <div className="mb-4 p-4 bg-gray-50 rounded-lg border">
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div><span className="text-gray-600">Features:</span> {modelInfo.exog_features?.join(', ') || 'None'}</div>
-                      <div><span className="text-gray-600">Order (p,d,q):</span> ({modelInfo.order?.join(', ') || '1,1,1'})</div>
-                      <div><span className="text-gray-600">AIC Score:</span> {modelInfo.aic?.toFixed(2) || 'N/A'}</div>
-                      {modelInfo.bic && (
-                        <div><span className="text-gray-600">BIC Score:</span> {modelInfo.bic?.toFixed(2) || 'N/A'}</div>
-                      )}
+        {/* Demand Forecasting Tab */}
+        {activeTab === 'demand' && (
+          <div>
+            {/* Chart and Metrics Layout - 70% Chart, 30% Metrics */}
+            <div className="mb-8 grid grid-cols-1 lg:grid-cols-10 gap-6">
+              {/* Chart Section - 70% width */}
+              <div className="lg:col-span-7">
+                <div className="bg-white rounded-xl border border-gray-200 shadow-lg p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-gradient-to-br from-sns-orange to-orange-600 rounded-lg shadow-md">
+                      <Activity className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900">Demand Forecast</h3>
+                      <p className="text-gray-600 text-sm">Interactive demand forecasting with confidence intervals</p>
                     </div>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white rounded-2xl border-0 ring-1 ring-[#F3E9DC] shadow-[0_10px_30px_rgba(217,111,50,0.06)]">
-              <CardHeader>
-                <CardTitle className="text-xl">Demand Prediction</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {/* Prediction Controls */}
-                <div className="mb-6 p-4 rounded-lg shadow-sm border ">
-                  <h3 className="font-semibold text-blue-900 mb-3">Prediction Controls</h3>
+                  
+                  {/* Prediction Controls */}
+                  <div className="mb-6 p-4 rounded-lg shadow-sm border bg-white/80 backdrop-blur-sm">
+                    <h3 className="font-semibold text-blue-900 mb-3">Prediction Controls</h3>
                   
                   <div className="space-y-4">
                     <div>
@@ -451,23 +477,18 @@ export default function Results({ datasetInfo, onRunAnotherModel }: ResultsProps
                   </div>
                 </div>
 
-                {/* Forecast Results */}
-                {predictions && (
-                  <div className="mt-6 mb-10">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold flex items-center">
-                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                        </svg>
-                        ARIMAX Forecast Results
-                      </h3>
-                      <span className="bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full">
-                        {predictions.dates.length} periods forecast
-                      </span>
-                    </div>
-                    <div className="h-[500px] md:h-[700px] bg-gradient-to-br from-slate-50 to-blue-50 rounded-xl p-6 border border-slate-200 shadow-lg">
-                      <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={chartDataSorted} margin={{ top: 30, right: 40, left: 30, bottom: 30 }}>
+                  {/* Forecast Results */}
+                  {predictions && (
+                    <div className="mt-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold">ARIMAX Forecast Results</h3>
+                        <span className="bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full">
+                          {predictions.dates.length} periods forecast
+                        </span>
+                      </div>
+                      <div className="h-[420px] md:h-[520px] bg-white rounded-xl border border-gray-200 shadow-lg p-6">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={chartDataSorted} margin={{ top: 30, right: 40, left: 30, bottom: 30 }}>
                         <CartesianGrid 
                           strokeDasharray="3 3" 
                           stroke="#e2e8f0" 
@@ -623,8 +644,8 @@ export default function Results({ datasetInfo, onRunAnotherModel }: ResultsProps
                             fontFamily: 'Inter, system-ui, sans-serif',
                             marginBottom: '8px'
                           }}
-                          formatter={(value: any, name: string) => {
-                            const formattedValue = typeof value === 'number' ? value.toLocaleString() : value
+                          formatter={(value: number | string, name: string): [string, string] => {
+                            const formattedValue = typeof value === 'number' ? value.toLocaleString() : String(value)
                             const labels: { [key: string]: string } = {
                               'prediction': 'Predicted Demand',
                               'upper_tight': 'Upper Confidence',
@@ -647,13 +668,7 @@ export default function Results({ datasetInfo, onRunAnotherModel }: ResultsProps
                             })
                           }}
                         />
-                        <Legend 
-                          wrapperStyle={{
-                            paddingTop: '20px',
-                            fontSize: '13px',
-                            fontFamily: 'Inter, system-ui, sans-serif'
-                          }}
-                        />
+                        <Legend wrapperStyle={{ paddingTop: '12px', fontSize: '13px', fontFamily: 'Inter, system-ui, sans-serif' }} />
                         <Line 
                           type="linear" 
                           dataKey="prediction" 
@@ -722,426 +737,453 @@ export default function Results({ datasetInfo, onRunAnotherModel }: ResultsProps
                           name={`Average (${averageDaily.toFixed(1)})`}
                           strokeOpacity={0.8}
                         />
-                      </LineChart>
-                    </ResponsiveContainer>
-                    </div>
-
-                    {/* Professional Insights Section */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-8">
-                      <div className="bg-gradient-to-br from-blue-50 via-blue-100 to-blue-200 rounded-2xl p-6 border border-blue-300 shadow-lg hover:shadow-xl transition-all duration-300">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="text-sm font-semibold text-blue-800 uppercase tracking-wide">Total Forecast</div>
-                          <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
-                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                            </svg>
-                      </div>
-                        </div>
-                        <div className="text-3xl font-bold text-blue-900 mb-1">{totalPredicted.toLocaleString()}</div>
-                        <div className="text-sm text-blue-700">units over {predictions.dates.length} days</div>
-                      </div>
-                      
-                      <div className="bg-gradient-to-br from-emerald-50 via-emerald-100 to-emerald-200 rounded-2xl p-6 border border-emerald-300 shadow-lg hover:shadow-xl transition-all duration-300">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="text-sm font-semibold text-emerald-800 uppercase tracking-wide">Daily Average</div>
-                          <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center">
-                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                            </svg>
-                        </div>
-                      </div>
-                        <div className="text-3xl font-bold text-emerald-900 mb-1">{averageDaily.toFixed(1)}</div>
-                        <div className="text-sm text-emerald-700">units per day</div>
-                        </div>
-                      
-                      <div className="bg-gradient-to-br from-purple-50 via-purple-100 to-purple-200 rounded-2xl p-6 border border-purple-300 shadow-lg hover:shadow-xl transition-all duration-300">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="text-sm font-semibold text-purple-800 uppercase tracking-wide">Peak Demand</div>
-                          <div className="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center">
-                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0v-6a1.5 1.5 0 013 0v6a1.5 1.5 0 01-3 0V14m0 0H4a2 2 0 00-2 2v1a2 2 0 002 2h3m0-4h10a2 2 0 002-2v-1a2 2 0 00-2-2H7m0 0V9a2 2 0 012-2h2a2 2 0 012 2v2.5" />
-                            </svg>
-                          </div>
-                        </div>
-                        <div className="text-3xl font-bold text-purple-900 mb-1">{peakPoint?.prediction?.toLocaleString() || '—'}</div>
-                        <div className="text-sm text-purple-700">{peakPoint ? new Date(peakPoint.date).toLocaleDateString() : 'No peak data'}</div>
-                      </div>
-                      
-                      <div className="bg-gradient-to-br from-amber-50 via-amber-100 to-amber-200 rounded-2xl p-6 border border-amber-300 shadow-lg hover:shadow-xl transition-all duration-300">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="text-sm font-semibold text-amber-800 uppercase tracking-wide">Trend Analysis</div>
-                          <div className="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center">
-                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0v-6a1.5 1.5 0 013 0v6a1.5 1.5 0 01-3 0V14m0 0H4a2 2 0 00-2 2v1a2 2 0 002 2h3m0-4h10a2 2 0 002-2v-1a2 2 0 00-2-2H7m0 0V9a2 2 0 012-2h2a2 2 0 012 2v2.5" />
-                            </svg>
-                          </div>
-                        </div>
-                        <div className="text-3xl font-bold text-amber-900 mb-1">{trendLabel}</div>
-                        <div className="text-sm text-amber-700 font-medium">Net Δ {netChange.toFixed(1)} units</div>
-                      </div>
-                    </div>
-
-                    {/* Professional Table Toggle */}
-                    <div className="mt-8 flex items-center justify-between bg-gradient-to-r from-slate-50 to-blue-50 rounded-xl p-4 border border-slate-200">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
-                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h2a2 2 0 002-2z" />
-                          </svg>
-                        </div>
-                        <div>
-                          <div className="text-sm font-semibold text-slate-800">Detailed Forecast Analysis</div>
-                          <div className="text-xs text-slate-600">Complete breakdown with trend analysis</div>
-                        </div>
-                      </div>
-                      <Button 
-                        variant="outline" 
-                        onClick={() => setShowDemandTable((s) => !s)}
-                        className="border-blue-300 text-blue-700 hover:bg-blue-50 hover:border-blue-400"
-                      >
-                        {showDemandTable ? 'Hide Table' : 'Show Table'}
-                      </Button>
-                    </div>
-
-                    {/* Professional Forecast Data Table */}
-                    {showDemandTable && (
-                    <Card className="mt-6 shadow-xl border-0 bg-white/90 backdrop-blur-sm">
-                      <CardHeader className="bg-gradient-to-r from-slate-50 to-blue-50 border-b border-slate-200">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <CardTitle className="text-2xl font-bold text-slate-800 flex items-center">
-                              <svg className="w-6 h-6 mr-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h2a2 2 0 002-2z" />
-                              </svg>
-                              Professional Forecast Analysis
-                            </CardTitle>
-                            <p className="text-sm text-slate-600 mt-2">Complete forecast breakdown with professional trend analysis and confidence intervals</p>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <div className="text-sm text-gray-500">{chartDataSorted.length} records</div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                if (!chartDataSorted || chartDataSorted.length === 0) return
-                                const csvData = chartDataSorted.map((row, index) => {
-                                  const prev = chartDataSorted[index - 1]?.prediction
-                                  const diff = typeof prev === 'number' ? row.prediction - prev : 0
-                                  const rounded = Math.round(diff * 10) / 10
-                                  const trend = index === 0 ? '0.0' : (rounded === 0 ? '0.0' : (rounded > 0 ? `+${rounded.toFixed(1)}` : `${rounded.toFixed(1)}`))
-                                  return {
-                                    Category: 'ARIMAX',
-                                    Date: new Date(row.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
-                                    Prediction: row.prediction.toFixed(1),
-                                    Trend: trend
-                                  }
-                                })
-                                const csvContent = [
-                                  Object.keys(csvData[0]).join(','),
-                                  ...csvData.map((r: any) => Object.values(r).join(','))
-                                ].join('\n')
-                                const blob = new Blob([csvContent], { type: 'text/csv' })
-                                const url = window.URL.createObjectURL(blob)
-                                const a = document.createElement('a')
-                                a.href = url
-                                a.download = `arimax_forecast_${predictions?.dates?.length || chartDataSorted.length}days.csv`
-                                a.click()
-                                window.URL.revokeObjectURL(url)
-                              }}
-                              className="text-blue-600 hover:text-blue-700"
-                            >
-                              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                              </svg>
-                              Export CSV
-                            </Button>
-                          </div>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="overflow-x-auto -mx-4 md:mx-0">
-                          <table className="w-full min-w-[700px]">
-                            <thead>
-                              <tr className="bg-gradient-to-r from-slate-100 to-blue-100 border-b-2 border-slate-300">
-                                <th className="text-left py-4 px-6 font-bold text-slate-800 uppercase tracking-wide text-sm">Model</th>
-                                <th className="text-left py-4 px-6 font-bold text-slate-800 uppercase tracking-wide text-sm">Forecast Date</th>
-                                <th className="text-left py-4 px-6 font-bold text-slate-800 uppercase tracking-wide text-sm">Predicted Demand</th>
-                                <th className="text-left py-4 px-6 font-bold text-slate-800 uppercase tracking-wide text-sm">Daily Change</th>
-                                <th className="text-left py-4 px-6 font-bold text-slate-800 uppercase tracking-wide text-sm">Confidence</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {chartDataSorted.map((row, index) => {
-                                const prev = chartDataSorted[index - 1]?.prediction
-                                const difference = typeof prev === 'number' ? row.prediction - prev : 0
-                                const roundedDifference = Math.round(difference * 10) / 10
-                                const hasConfidence = row.lower_tight && row.upper_tight
-                                const confidenceRange = hasConfidence ? (row.upper_tight! - row.lower_tight!).toFixed(1) : 'N/A'
-                                
-                                return (
-                                  <tr key={row.date} className="border-b border-slate-200 hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-slate-50/50 transition-all duration-200">
-                                    <td className="py-4 px-6">
-                                      <div className="flex items-center">
-                                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center mr-4 shadow-lg">
-                                          <span className="text-sm font-bold text-white">AX</span>
-                                        </div>
-                                        <div>
-                                          <span className="font-bold text-slate-800">ARIMAX</span>
-                                          <div className="text-xs text-slate-600">Professional Forecast</div>
-                                        </div>
-                                      </div>
-                                    </td>
-                                    <td className="py-4 px-6">
-                                      <div className="flex flex-col">
-                                        <span className="font-semibold text-slate-800">
-                                          {new Date(row.date).toLocaleDateString('en-US', { 
-                                            weekday: 'short',
-                                            year: 'numeric', 
-                                            month: 'short', 
-                                            day: 'numeric' 
-                                          })}
-                                        </span>
-                                        <span className="text-xs text-slate-500">Day {index + 1}</span>
-                                      </div>
-                                    </td>
-                                    <td className="py-4 px-6">
-                                      <div className="flex items-center space-x-2">
-                                        <span className="text-2xl font-bold text-blue-600">{row.prediction.toLocaleString()}</span>
-                                        <span className="text-sm text-slate-500 font-medium">units</span>
-                      </div>
-                                    </td>
-                                    <td className="py-4 px-6">
-                                      {index === 0 ? (
-                                        <div className="flex items-center">
-                                          <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center mr-2">
-                                            <span className="text-sm font-bold text-slate-600">—</span>
-                                          </div>
-                                          <span className="font-semibold text-slate-600">Baseline</span>
-                                        </div>
-                                      ) : roundedDifference === 0 ? (
-                                        <div className="flex items-center">
-                                          <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center mr-2">
-                                            <span className="text-sm font-bold text-slate-600">0</span>
-                                          </div>
-                                          <span className="font-semibold text-slate-600">No Change</span>
-                                        </div>
-                                      ) : roundedDifference > 0 ? (
-                                        <div className="flex items-center">
-                                          <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center mr-2">
-                                            <span className="text-sm font-bold text-emerald-600">↗</span>
-                                          </div>
-                                          <span className="font-bold text-emerald-600">+{roundedDifference.toFixed(1)}</span>
-                                        </div>
-                                      ) : (
-                                        <div className="flex items-center">
-                                          <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center mr-2">
-                                            <span className="text-sm font-bold text-red-600">↘</span>
-                                          </div>
-                                          <span className="font-bold text-red-600">{roundedDifference.toFixed(1)}</span>
-                        </div>
-                      )}
-                                    </td>
-                                    <td className="py-4 px-6">
-                                      {hasConfidence ? (
-                                        <div className="flex flex-col">
-                                          <span className="font-semibold text-slate-800">±{confidenceRange}</span>
-                                          <span className="text-xs text-slate-500">Range: {row.lower_tight!.toFixed(0)} - {row.upper_tight!.toFixed(0)}</span>
-                    </div>
-                                      ) : (
-                                        <span className="text-slate-400 font-medium">N/A</span>
-                                      )}
-                                    </td>
-                                  </tr>
-                                )
-                              })}
-                            </tbody>
-                          </table>
-                    </div>
-                      </CardContent>
-                    </Card>
-                      )}
-                    
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white rounded-2xl border-0 ring-1 ring-[#F3E9DC] shadow-[0_10px_30px_rgba(217,111,50,0.06)]">
-              <CardHeader>
-                <CardTitle className="text-xl">Price Optimization</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {/* Optimization Controls */}
-                <div className="mb-6 p-4 shadow-md rounded-lg border ">
-                  <h3 className="font-semibold text-purple-900 mb-3">Price Optimization Controls</h3>
-                  
-                  <div className="grid grid-cols-2 gap-3 mb-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Base Price ($)
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={optimizationParams.base_price}
-                        onChange={(e) => handleOptimizationParamChange('base_price', e.target.value)}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Cost Per Unit ($)
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={optimizationParams.cost_per_unit}
-                        onChange={(e) => handleOptimizationParamChange('cost_per_unit', e.target.value)}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Price Range (±)
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={optimizationParams.price_range}
-                        onChange={(e) => handleOptimizationParamChange('price_range', e.target.value)}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Steps
-                      </label>
-                      <input
-                        type="number"
-                        value={optimizationParams.steps}
-                        onChange={(e) => handleOptimizationParamChange('steps', e.target.value)}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                      />
-                    </div>
-                  </div>
-
-                  {/* <div className="mb-4">
-                    <label className="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={optimizationParams.include_confidence}
-                        onChange={(e) => handleOptimizationParamChange('include_confidence', e.target.checked)}
-                        className="mr-2"
-                      />
-                      Include Confidence Intervals in Optimization
-                    </label>
-                  </div> */}
-
-                  <Button
-                    onClick={optimizePrice}
-                    disabled={optimizing || !modelInfo}
-                    className="bg-sns-orange hover:bg-sns-orange-dark text-white"
-                  >
-                    {optimizing ? 'Optimizing Prices...' : 'Optimize Pricing Strategy'}
-                  </Button>
-                </div>
-
-                {error && (
-                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                    <div className="flex items-center">
-                      <svg className="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <span className="text-red-700 font-medium">{error}</span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Optimization Results */}
-            {optimizationResults && (
-                  <div className="mt-6">
-                    <h3 className="text-lg font-semibold mb-4 flex items-center">
-                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      Price Optimization Analysis
-                    </h3>
-                        {optimizationResults.best_price && (
-                      <div className="p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg border mb-10 border-green-200">
-                        <h4 className="font-semibold text-green-900 mb-3 flex items-center">
-                          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          Optimal Pricing Recommendation
-                        </h4>
-                        <div className="grid grid-cols-3 gap-4 text-center">
-                          <div className="bg-white p-3 rounded-lg shadow-sm">
-                            <div className="text-2xl font-bold text-green-600">${optimizationResults.best_price.price.toFixed(2)}</div>
-                            <div className="text-sm text-gray-600">Optimal Price</div>
-                          </div>
-                          <div className="bg-white p-3 rounded-lg shadow-sm">
-                            <div className="text-2xl font-bold text-blue-600">${optimizationResults.best_price.profit.toFixed(2)}</div>
-                            <div className="text-sm text-gray-600">Expected Profit</div>
-                          </div>
-                          <div className="bg-white p-3 rounded-lg shadow-sm">
-                            <div className="text-2xl font-bold text-purple-600">{optimizationResults.best_price.predicted_demand.toFixed(0)}</div>
-                            <div className="text-sm text-gray-600">Expected Demand</div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                      <div>
-                        <h4 className="font-semibold text-gray-900 mb-4">Demand & Profit vs Price</h4>
-                        <ResponsiveContainer width="100%" height={250}>
-                          <LineChart data={optimizationChartData}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                            <XAxis dataKey="price" />
-                            <YAxis />
-                            <Tooltip contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '8px' }} />
-                            <Legend />
-                            <Line 
-                              type="monotone" 
-                              dataKey="predicted_demand" 
-                              stroke="#3b82f6" 
-                              strokeWidth={2}
-                              name="Demand"
-                            />
-                            <Line 
-                              type="monotone" 
-                              dataKey="profit" 
-                              stroke="#10b981" 
-                              strokeWidth={2}
-                              name="Profit"
-                            />
                           </LineChart>
                         </ResponsiveContainer>
                       </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* Metrics Section - 30% width */}
+              <div className="lg:col-span-3">
+                        <div className="space-y-4">
+                          {/* Total Forecast Card */}
+                          <motion.div 
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200 shadow-md flex flex-col justify-center"
+                          >
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className="p-1.5 bg-blue-500 rounded-md">
+                                <Activity className="h-4 w-4 text-white" />
+                              </div>
+                              <h3 className="text-blue-700 font-semibold text-sm">Total Forecast</h3>
+                            </div>
+                            <div className="text-xl font-bold text-blue-900 mb-1">
+                              {totalPredicted.toLocaleString()}
+                            </div>
+                            <p className="text-blue-600 text-xs">units over {(predictions?.dates.length ?? chartDataSorted.length)} days</p>
+                          </motion.div>
 
-                      <div>
-                        <h4 className="font-semibold text-gray-900 mb-4">Profit Distribution</h4>
-                        <ResponsiveContainer width="100%" height={250}>
-                          <BarChart data={optimizationChartData}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                            <XAxis dataKey="price" />
-                            <YAxis />
-                            <Tooltip contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '8px' }} />
-                            <Legend />
-                            <Bar dataKey="profit" fill="#10b981" name="Profit" radius={[4, 4, 0, 0]} />
-                          </BarChart>
-                        </ResponsiveContainer>
+                          {/* Daily Average Card */}
+                          <motion.div 
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.1 }}
+                            className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 border border-green-200 shadow-md flex flex-col justify-center"
+                          >
+                            <div className="flex items-center gap-2 mb-1">
+                              <div className="p-1.5 bg-green-500 rounded-md">
+                                <BarChart3 className="h-4 w-4 text-white" />
+                              </div>
+                              <h3 className="text-green-700 font-semibold text-sm">Daily Average</h3>
+                            </div>
+                            <div className="text-xl font-bold text-green-900 mb-1">
+                              {averageDaily.toFixed(1)}
+                            </div>
+                            <p className="text-green-600 text-xs">units per day</p>
+                          </motion.div>
+
+                          {/* Peak Demand Card */}
+                          <motion.div 
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.2 }}
+                            className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 border border-purple-200 shadow-md flex flex-col justify-center"
+                          >
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className="p-1.5 bg-purple-500 rounded-md">
+                                <TrendingUp className="h-4 w-4 text-white" />
+                              </div>
+                              <h3 className="text-purple-700 font-semibold text-sm">Peak Demand</h3>
+                            </div>
+                            <div className="text-xl font-bold text-purple-900 mb-1">
+                              {peakPoint?.prediction?.toLocaleString() || '—'}
+                            </div>
+                            <p className="text-purple-600 text-xs">
+                              {peakPoint ? new Date(peakPoint.date).toLocaleDateString() : 'No peak data'}
+                            </p>
+                          </motion.div>
+
+                          {/* Trend Card */}
+                          <motion.div 
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.3 }}
+                            className={`rounded-lg p-4 border shadow-md flex flex-col justify-center ${
+                              trendLabel === 'Rising' 
+                                ? 'bg-gradient-to-br from-green-50 to-green-100 border-green-200'
+                                : trendLabel === 'Declining'
+                                ? 'bg-gradient-to-br from-red-50 to-red-100 border-red-200'
+                                : 'bg-gradient-to-br from-gray-50 to-gray-100 border-gray-200'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className={`p-1.5 rounded-md ${
+                                trendLabel === 'Rising' 
+                                  ? 'bg-green-500'
+                                  : trendLabel === 'Declining'
+                                  ? 'bg-red-500'
+                                  : 'bg-gray-500'
+                              }`}>
+                                {trendLabel === 'Rising' ? (
+                                  <TrendingUp className="h-4 w-4 text-white" />
+                                ) : trendLabel === 'Declining' ? (
+                                  <TrendingDown className="h-4 w-4 text-white" />
+                                ) : (
+                                  <BarChart3 className="h-4 w-4 text-white" />
+                                )}
+                              </div>
+                              <h3 className={`font-semibold text-sm ${
+                                trendLabel === 'Rising' 
+                                  ? 'text-green-700'
+                                  : trendLabel === 'Declining'
+                                  ? 'text-red-700'
+                                  : 'text-gray-700'
+                              }`}>Trend</h3>
+                            </div>
+                            <div className={`text-xl font-bold mb-1 ${
+                              trendLabel === 'Rising' 
+                                ? 'text-green-900'
+                                : trendLabel === 'Declining'
+                                ? 'text-red-900'
+                                : 'text-gray-900'
+                            }`}>
+                              {trendLabel}
+                            </div>
+                            <p className={`text-xs ${
+                              trendLabel === 'Rising' 
+                                ? 'text-green-600'
+                                : trendLabel === 'Declining'
+                                ? 'text-red-600'
+                                : 'text-gray-600'
+                            }`}>
+                              Net Δ {netChange.toFixed(1)} units
+                            </p>
+                          </motion.div>
+                        </div>
                       </div>
                     </div>
 
-                
+                    {/* Table banner removed */}
+
+                    {/* Professional Forecast Data Table */}
+                    <div className="mb-8">
+                      <div className="rounded-xl bg-white shadow-lg">
+                        <div className="p-6">
+                          {/* Professional Header */}
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                              <div>
+                                <h3 className="text-xl font-bold text-gray-900">Forecast Analysis</h3>
+                                <p className="text-gray-600 text-sm">Daily forecast breakdown with confidence intervals</p>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* Professional Table Container */}
+                          <div className="bg-white rounded-xl border border-gray-200 shadow-lg overflow-hidden">
+                            {/* Enhanced Table Header */}
+                            <div className="bg-gradient-to-r from-sns-orange via-orange-500 to-orange-600 px-4 py-3">
+                              <div className="grid grid-cols-5 gap-4 text-white font-semibold text-xs">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2 h-2 bg-white rounded-full"></div>
+                                  Forecast Date
+                                </div>
+                                <div className="text-right flex items-center justify-end gap-2">
+                                  <div className="w-2 h-2 bg-white rounded-full"></div>
+                                  Predicted Demand
+                                </div>
+                                <div className="text-right flex items-center justify-end gap-2">
+                                  <div className="w-2 h-2 bg-white rounded-full"></div>
+                                  Daily Change
+                                </div>
+                                <div className="text-right flex items-center justify-end gap-2">
+                                  <div className="w-2 h-2 bg-white rounded-full"></div>
+                                  Lower Bound
+                                </div>
+                                <div className="text-right flex items-center justify-end gap-2">
+                                  <div className="w-2 h-2 bg-white rounded-full"></div>
+                                  Upper Bound
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Enhanced Table Body */}
+                            <div className="max-h-96 overflow-y-auto">
+                              <div className="divide-y divide-gray-100">
+                                {chartDataSorted.map((row, index) => {
+                                  const prev = chartDataSorted[index - 1]?.prediction
+                                  const diff = typeof prev === 'number' ? row.prediction - prev : 0
+                                  const delta = Math.round(diff * 10) / 10
+                                  const lowerVal = (typeof row.lower_tight === 'number' ? row.lower_tight : row.lower_bound)
+                                  const upperVal = (typeof row.upper_tight === 'number' ? row.upper_tight : row.upper_bound)
+                                  const hasLower = typeof lowerVal === 'number'
+                                  const hasUpper = typeof upperVal === 'number'
+                                  return (
+                                    <div
+                                      key={row.date}
+                                      className="grid grid-cols-5 gap-4 px-4 py-3 items-center hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-indigo-50/30 transition-all duration-200"
+                                    >
+                                      {/* Date */}
+                                      <div className="flex items-center">
+                                        <div className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
+                                          {new Date(row.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                        </div>
+                                      </div>
+                                      
+                                      {/* Predicted Demand */}
+                                      <div className="text-right tabular-nums">
+                                        <div className="text-sm font-bold text-gray-900">{row.prediction.toFixed(1)}</div>
+                                        <div className="text-xs text-gray-500">units</div>
+                                      </div>
+                                      
+                                      {/* Daily Change */}
+                                      <div className="text-right tabular-nums">
+                                        {index === 0 ? (
+                                          <div className="text-gray-400 text-sm">-</div>
+                                        ) : (
+                                          <div className="flex items-center justify-end gap-1">
+                                            {delta > 0 ? (
+                                              <TrendingUp className="h-4 w-4 text-green-500" />
+                                            ) : delta < 0 ? (
+                                              <TrendingDown className="h-4 w-4 text-red-500" />
+                                            ) : (
+                                              <div className="h-4 w-4 bg-gray-300 rounded-full"></div>
+                                            )}
+                                            <span className={`text-sm font-semibold ${delta > 0 ? 'text-green-600' : delta < 0 ? 'text-red-600' : 'text-gray-600'}`}>
+                                              {delta > 0 ? '+' : ''}{delta.toFixed(1)}
+                                            </span>
+                                          </div>
+                                        )}
+                                      </div>
+                                      
+                                      {/* Lower Bound */}
+                                      <div className="text-right tabular-nums">
+                                        {hasLower ? (
+                                          <div className="text-sm font-semibold text-gray-900">{(lowerVal as number).toFixed(1)}</div>
+                                        ) : (
+                                          <div className="text-gray-400 text-sm">N/A</div>
+                                        )}
+                                        <div className="text-xs text-gray-500">units</div>
+                                      </div>
+                                      
+                                      {/* Upper Bound */}
+                                      <div className="text-right tabular-nums">
+                                        {hasUpper ? (
+                                          <div className="text-sm font-semibold text-gray-900">{(upperVal as number).toFixed(1)}</div>
+                                        ) : (
+                                          <div className="text-gray-400 text-sm">N/A</div>
+                                        )}
+                                        <div className="text-xs text-gray-500">units</div>
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
-               
-              </CardContent>
-            </Card>
+              </div>
+      
+
+        {/* Price Analysis Tab */}
+        {activeTab === 'pricing' && (
+          <div className="space-y-8">
+            <div className="bg-white/60 backdrop-blur-md border border-white/40 rounded-xl p-6 shadow-[0_8px_24px_rgba(0,0,0,0.06)]">
+              <h3 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-3">
+                <div className="p-2 bg-sns-orange rounded-lg">
+                  <BarChart3 className="h-6 w-6 text-white" />
+                </div>
+                Price Optimization & Analysis
+              </h3>
+              <p className="text-gray-600 mb-6">
+                Advanced price elasticity analysis and revenue optimization for demand forecasting.
+              </p>
+              {/* Price Optimization Controls */}
+              <div className="mb-6 p-4 shadow-md rounded-lg border bg-white/80 backdrop-blur-sm">
+                <h3 className="font-semibold text-purple-900 mb-3 flex items-center gap-2">
+                  <Target className="h-4 w-4" />
+                  Price Optimization Controls
+                </h3>
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Base Price ($)</label>
+                    <input 
+                      type="number" 
+                      step="0.01" 
+                      value={optimizationParams.base_price} 
+                      onChange={(e) => handleOptimizationParamChange('base_price', e.target.value)} 
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-sns-orange focus:border-transparent" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Cost Per Unit ($)</label>
+                    <input 
+                      type="number" 
+                      step="0.01" 
+                      value={optimizationParams.cost_per_unit} 
+                      onChange={(e) => handleOptimizationParamChange('cost_per_unit', e.target.value)} 
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-sns-orange focus:border-transparent" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Price Range (±)</label>
+                    <input 
+                      type="number" 
+                      step="0.01" 
+                      value={optimizationParams.price_range} 
+                      onChange={(e) => handleOptimizationParamChange('price_range', e.target.value)} 
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-sns-orange focus:border-transparent" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Steps</label>
+                    <input 
+                      type="number" 
+                      value={optimizationParams.steps} 
+                      onChange={(e) => handleOptimizationParamChange('steps', e.target.value)} 
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-sns-orange focus:border-transparent" 
+                    />
+                  </div>
+                </div>
+                <Button 
+                  onClick={optimizePrice} 
+                  disabled={optimizing || !modelInfo} 
+                  className="bg-sns-orange hover:bg-sns-orange-dark text-white shadow-lg hover:shadow-xl transition-all duration-200"
+                >
+                  {optimizing ? (
+                    <div className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Optimizing Prices...
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Target className="h-4 w-4" />
+                      Optimize Pricing Strategy
+                    </div>
+                  )}
+                </Button>
+              </div>
+
+              {error && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="p-4 bg-red-50 border border-red-200 rounded-lg mb-6"
+                >
+                  <div className="text-red-700 font-medium flex items-center gap-2">
+                    <Shield className="h-4 w-4" />
+                    {error}
+                  </div>
+                </motion.div>
+              )}
+
+              {optimizationResults && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-6"
+                >
+                  {optimizationResults.best_price && (
+                    <motion.div 
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: 0.2 }}
+                      className="p-6 bg-gradient-to-r from-green-50 to-blue-50 rounded-xl border border-green-200 shadow-lg mb-8"
+                    >
+                      <h4 className="font-semibold text-green-900 mb-4 flex items-center gap-2">
+                        <Target className="h-5 w-5" />
+                        Optimal Pricing Recommendation
+                      </h4>
+                      <div className="grid grid-cols-3 gap-4 text-center">
+                        <motion.div 
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.3 }}
+                          className="bg-white p-4 rounded-lg shadow-md hover:shadow-lg transition-shadow"
+                        >
+                          <div className="text-2xl font-bold text-green-600">${optimizationResults.best_price.price.toFixed(2)}</div>
+                          <div className="text-sm text-gray-600">Optimal Price</div>
+                        </motion.div>
+                        <motion.div 
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.4 }}
+                          className="bg-white p-4 rounded-lg shadow-md hover:shadow-lg transition-shadow"
+                        >
+                          <div className="text-2xl font-bold text-blue-600">${optimizationResults.best_price.profit.toFixed(2)}</div>
+                          <div className="text-sm text-gray-600">Expected Profit</div>
+                        </motion.div>
+                        <motion.div 
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.5 }}
+                          className="bg-white p-4 rounded-lg shadow-md hover:shadow-lg transition-shadow"
+                        >
+                          <div className="text-2xl font-bold text-purple-600">{optimizationResults.best_price.predicted_demand.toFixed(0)}</div>
+                          <div className="text-sm text-gray-600">Expected Demand</div>
+                        </motion.div>
+                      </div>
+                    </motion.div>
+                  )}
+                  
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                    <motion.div 
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.6 }}
+                      className="bg-white rounded-xl border border-gray-200 shadow-lg p-6"
+                    >
+                      <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                        <BarChart3 className="h-5 w-5" />
+                        Demand & Profit vs Price
+                      </h4>
+                      <ResponsiveContainer width="100%" height={250}>
+                        <LineChart data={optimizationChartData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                          <XAxis dataKey="price" />
+                          <YAxis />
+                          <Tooltip contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '8px' }} />
+                          <Legend />
+                          <Line type="monotone" dataKey="predicted_demand" stroke="#3b82f6" strokeWidth={2} name="Demand" />
+                          <Line type="monotone" dataKey="profit" stroke="#10b981" strokeWidth={2} name="Profit" />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </motion.div>
+                    
+                    <motion.div 
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.7 }}
+                      className="bg-white rounded-xl border border-gray-200 shadow-lg p-6"
+                    >
+                      <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                        <Activity className="h-5 w-5" />
+                        Profit Distribution
+                      </h4>
+                      <ResponsiveContainer width="100%" height={250}>
+                        <BarChart data={optimizationChartData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                          <XAxis dataKey="price" />
+                          <YAxis />
+                          <Tooltip contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '8px' }} />
+                          <Legend />
+                          <Bar dataKey="profit" fill="#10b981" name="Profit" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </motion.div>
+                  </div>
+                </motion.div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
-    </div>
   )
 }

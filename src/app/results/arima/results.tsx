@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button'
 import { ResponsiveContainer, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line } from 'recharts'
 import { BreadcrumbNav } from '@/components/breadcrumb-nav'
 import ExportModal from '@/components/ui/export-modal'
+import type { ArimaExportInput } from '@/lib/exporters/arimaExport'
+import { exportArimaToXlsx } from '@/lib/exporters/arimaExport'
 
 interface ResultsProps {
   datasetInfo: DatasetInfo | null
@@ -107,6 +109,25 @@ export default function Results({ datasetInfo, onRunAnotherModel }: ResultsProps
   return (
     <div className="min-h-screen bg-sns-cream/20">
       {/* Full page layout without sidebar */}
+      {showExport && (
+        <ExportModal<ArimaExportInput>
+          onClose={() => setShowExport(false)}
+          title="Export ARIMA Forecast"
+          subtitle="Download an Excel file with forecast data."
+          input={{
+            forecast: chartDataSorted.map(d => ({
+              date: d.date,
+              prediction: d.prediction,
+              lower: d.lower ?? null,
+              upper: d.upper ?? null,
+              lower_tight: d.lower_tight ?? null,
+              upper_tight: d.upper_tight ?? null,
+            })),
+          }}
+          onExport={exportArimaToXlsx}
+          buildFilename={() => `arima_export_${new Date().toISOString().slice(0,10)}.xlsx`}
+        />
+      )}
       <div className="px-4 sm:px-6 lg:px-8 py-8">
         <BreadcrumbNav items={breadcrumbItems} />
 
@@ -426,19 +447,19 @@ export default function Results({ datasetInfo, onRunAnotherModel }: ResultsProps
                         <div className="grid grid-cols-4 gap-3 text-white font-semibold text-xs">
                           <div className="flex items-center gap-2">
                             <div className="w-2 h-2 bg-white rounded-full"></div>
-                            Category
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 bg-white rounded-full"></div>
-                            Date
+                            Forecast Date
                           </div>
                           <div className="text-right flex items-center justify-end gap-2">
                             <div className="w-2 h-2 bg-white rounded-full"></div>
-                            Forecast
+                            Predicted Demand
                           </div>
                           <div className="text-right flex items-center justify-end gap-2">
                             <div className="w-2 h-2 bg-white rounded-full"></div>
-                            Trend
+                            Daily Change
+                          </div>
+                          <div className="text-right flex items-center justify-end gap-2">
+                            <div className="w-2 h-2 bg-white rounded-full"></div>
+                            Upper/Lower Bound
                           </div>
                         </div>
                       </div>
@@ -449,54 +470,46 @@ export default function Results({ datasetInfo, onRunAnotherModel }: ResultsProps
                                 const prev = chartDataSorted[index - 1]?.prediction
                                 const difference = typeof prev === 'number' ? row.prediction - prev : 0
                                 const roundedDifference = Math.round(difference * 10) / 10
+                                const hasBounds = typeof row.lower_tight === 'number' && typeof row.upper_tight === 'number'
                                 return (
                               <div key={row.date} 
                                    className="grid grid-cols-4 gap-3 px-4 py-3 hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-indigo-50/30 transition-all duration-200">
-                                {/* Category */}
-                                      <div className="flex items-center">
-                                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                                          <span className="text-sm font-semibold text-blue-600">A</span>
-                                        </div>
-                                        <span className="font-medium text-gray-800">ARIMA</span>
-                                      </div>
-                                
-                                {/* Date */}
-                                      <div className="flex items-center">
+                                {/* Forecast Date */}
+                                <div className="flex items-center">
                                   <div className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
                                     {new Date(row.date).toLocaleDateString('en-US', { 
                                       month: 'short', 
-                                      day: 'numeric' 
+                                      day: 'numeric',
+                                      year: 'numeric'
                                     })}
                                   </div>
                                 </div>
-                                
-                                {/* Forecast */}
+
+                                {/* Predicted Demand */}
                                 <div className="text-right">
                                   <div className="text-sm font-bold text-gray-900">
                                     {row.prediction.toFixed(1)}
                                   </div>
                                   <div className="text-xs text-gray-500">units</div>
-                                      </div>
-                                
-                                {/* Trend */}
+                                </div>
+
+                                {/* Daily Change */}
                                 <div className="text-right">
-                                      {index === 0 ? (
+                                  {index === 0 ? (
                                     <div className="text-gray-400 text-sm">-</div>
                                   ) : (
-                                    <div className="flex items-center justify-end gap-1">
-                                      {roundedDifference > 0 ? (
-                                        <TrendingUp className="h-4 w-4 text-green-500" />
-                                      ) : roundedDifference < 0 ? (
-                                        <TrendingDown className="h-4 w-4 text-red-500" />
-                                      ) : (
-                                        <div className="h-4 w-4 bg-gray-300 rounded-full"></div>
-                                      )}
-                                      <span className={`text-sm font-semibold ${
-                                        roundedDifference > 0 ? 'text-green-600' : roundedDifference < 0 ? 'text-red-600' : 'text-gray-600'
-                                      }`}>
-                                        {roundedDifference > 0 ? '+' : ''}{roundedDifference.toFixed(1)}
-                                      </span>
-                                    </div>
+                                    <span className={`text-sm font-semibold ${roundedDifference > 0 ? 'text-green-600' : roundedDifference < 0 ? 'text-red-600' : 'text-gray-600'}`}>
+                                      {roundedDifference > 0 ? '+' : ''}{roundedDifference.toFixed(1)}
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* Upper/Lower Bound */}
+                                <div className="text-right">
+                                  {hasBounds ? (
+                                    <div className="text-sm font-semibold text-gray-900">{row.upper_tight!.toFixed(1)} / {row.lower_tight!.toFixed(1)}</div>
+                                  ) : (
+                                    <div className="text-gray-400 text-sm">N/A</div>
                                   )}
                                 </div>
                               </div>

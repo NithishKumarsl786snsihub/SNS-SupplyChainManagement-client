@@ -8,26 +8,26 @@ import { Button } from '@/components/ui/button'
 import { FileText, Download, CheckCircle } from 'lucide-react'
 import { FileUploadZone } from '@/components/file-upload-zone'
 import { DataTable } from '@/components/data-table'
-import { UploadProgress } from '@/components/upload-progress'
+import LoaderSpinner from '@/components/ui/loader'
 
-type PreviewRow = { row: string[] }
 
 interface UploadProps {
   onProcessingComplete: (datasetInfo: DatasetInfo) => void
 }
 
+
 export default function Upload({ onProcessingComplete }: UploadProps) {
   const [uploading, setUploading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
-  const [datasetInfo, setDatasetInfo] = useState<DatasetInfo | null>(null)
-  const [datasetPreview, setDatasetPreview] = useState<PreviewRow[]>([])
-  const [showPreview, setShowPreview] = useState<boolean>(false)
+  const [showErrorModal, setShowErrorModal] = useState(false)
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [isDownloaded, setIsDownloaded] = useState(false)
   const [uploadSteps, setUploadSteps] = useState<Array<{ id: string; label: string; status: 'pending' | 'processing' | 'completed' | 'error'; message?: string }>>([
     { id: 'upload', label: 'File Upload', status: 'pending' },
     { id: 'validate', label: 'Data Validation', status: 'pending' },
     { id: 'parse', label: 'Column Analysis', status: 'pending' },
+    { id: 'train', label: 'Training ARIMAX Model', status: 'pending' },
+    { id: 'predict', label: 'Generating Forecast', status: 'pending' },
     { id: 'ready', label: 'Ready for Results', status: 'pending' },
   ])
 
@@ -74,7 +74,7 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
     setTimeout(() => setIsDownloaded(false), 1500)
   }
 
-  type UploadMeta = { columnsCount: number; rowsCount: number; hasRequired: boolean }
+  type UploadMeta = { columnsCount: number; rowsCount: number; hasRequired: boolean; datasetInfo: DatasetInfo }
 
   const uploadFileToBackend = async (file: File): Promise<UploadMeta> => {
     const formData = new FormData()
@@ -88,20 +88,19 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
       const response = await axios.post<UploadResponse>('http://localhost:8000/api/arimax/upload-dataset/', formData, { 
         headers: { 'Content-Type': 'multipart/form-data' } 
       })
-      setDatasetInfo(response.data.dataset_info)
 
       const text = await file.text()
       const allLines = text.trim().split(/\r?\n/)
-      const lines = allLines.slice(0, 6)
-      const previewData: PreviewRow[] = lines.map((line) => ({ row: line.split(',') }))
-      setDatasetPreview(previewData)
-      setShowPreview(true)
-
       const headers = allLines[0]?.split(',') ?? []
       const hasRequired = headers.includes('date') && headers.includes('demand')
       const rowsCount = Math.max(allLines.length - 1, 0)
 
-      return { columnsCount: headers.length, rowsCount, hasRequired }
+      return { 
+        columnsCount: headers.length, 
+        rowsCount, 
+        hasRequired,
+        datasetInfo: response.data.dataset_info
+      }
     } catch (err) {
       if (axios.isAxiosError(err) && err.response) {
         setError((err.response.data as ApiError).error || 'Upload failed')
@@ -110,13 +109,16 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
       }
       throw err
     } finally {
-      setUploading(false)
+      // keep uploading state controlled by startProcessing to avoid flicker
     }
   }
 
   const startProcessing = async (file: File) => {
     setUploadedFile(file)
+    setUploading(true)
+    setError(null)
     setUploadSteps((s) => s.map((st) => (st.id === 'upload' ? { ...st, status: 'processing', message: 'Uploading file...' } : st)))
+    
     try {
       const meta = await uploadFileToBackend(file)
       setUploadSteps((s) => s.map((st) => (st.id === 'upload' ? { ...st, status: 'completed', message: 'File uploaded' } : st)))
@@ -129,11 +131,40 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
       await new Promise((r) => setTimeout(r, 500))
       setUploadSteps((s) => s.map((st) => (st.id === 'parse' ? { ...st, status: 'completed', message: `${meta.columnsCount} columns detected` } : st)))
 
+      setUploadSteps((s) => s.map((st) => (st.id === 'train' ? { ...st, status: 'processing', message: 'Training ARIMAX model...' } : st)))
+      try {
+        await axios.post('http://localhost:8000/api/arimax/train/')
+        setUploadSteps((s) => s.map((st) => (st.id === 'train' ? { ...st, status: 'completed', message: 'Model trained' } : st)))
+      } catch {
+        setUploadSteps((s) => s.map((st) => (st.id === 'train' ? { ...st, status: 'error', message: 'Training failed' } : st)))
+        throw new Error('Model training failed')
+      }
+
+      setUploadSteps((s) => s.map((st) => (st.id === 'predict' ? { ...st, status: 'processing', message: 'Generating 30-day forecast...' } : st)))
+      try {
+        await axios.post('http://localhost:8000/api/arimax/predict/', {
+          prediction_type: 'auto',
+          periods: 30,
+          include_confidence: true
+        })
+        setUploadSteps((s) => s.map((st) => (st.id === 'predict' ? { ...st, status: 'completed', message: 'Forecast generated' } : st)))
+      } catch {
+        setUploadSteps((s) => s.map((st) => (st.id === 'predict' ? { ...st, status: 'error', message: 'Prediction failed' } : st)))
+        throw new Error('Prediction failed')
+      }
+
       setUploadSteps((s) => s.map((st) => (st.id === 'ready' ? { ...st, status: 'processing', message: 'Preparing results...' } : st)))
       await new Promise((r) => setTimeout(r, 600))
       setUploadSteps((s) => s.map((st) => (st.id === 'ready' ? { ...st, status: 'completed', message: 'Ready' } : st)))
+      
+      // Complete processing and call the callback with the datasetInfo from uploadFileToBackend
+      setUploading(false)
+      onProcessingComplete(meta.datasetInfo)
     } catch {
       setUploadSteps((s) => s.map((st) => (st.id === 'upload' ? { ...st, status: 'error', message: 'Upload failed' } : st)))
+      setUploading(false)
+      setError('Upload failed. Please try again.')
+      setShowErrorModal(true)
     }
   }
 
@@ -145,14 +176,17 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
   const handleFileUploadZone = (file: File) => startProcessing(file)
   const handleFileRemove = () => {
     setUploadedFile(null)
-    setDatasetInfo(null)
-    setDatasetPreview([])
-    setShowPreview(false)
     setError(null)
     setUploadSteps((prev) => prev.map((s) => ({ ...s, status: 'pending' as const, message: undefined })))
   }
 
-  const togglePreview = () => setShowPreview(!showPreview)
+  const handleErrorModalClose = () => {
+    setShowErrorModal(false)
+    setError(null)
+    setUploadedFile(null)
+    setUploadSteps((prev) => prev.map((s) => ({ ...s, status: 'pending' as const, message: undefined })))
+  }
+
 
   return (
     <>
@@ -213,8 +247,8 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
-        <Card className="rounded-2xl border-0 bg-white/70 backdrop-blur ring-1 ring-[#F3E9DC] shadow-[0_10px_30px_rgba(217,111,50,0.06)]">
+      <div className="grid grid-cols-1 gap-8 mb-10">
+        <Card>
           <CardHeader>
             <CardTitle>Upload Your Data (CSV)</CardTitle>
           </CardHeader>
@@ -227,67 +261,89 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
               isUploading={uploading}
               uploadError={error}
             />
-
-            {datasetInfo && (
-              <div className="mt-6 space-y-4">
-                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <h3 className="font-semibold text-blue-900 mb-2">Dataset Information</h3>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div><span className="text-blue-700">Rows:</span> {datasetInfo.rows}</div>
-                    <div><span className="text-blue-700">Columns:</span> {datasetInfo.columns.length}</div>
-                    <div><span className="text-blue-700">Avg Demand:</span> {datasetInfo.demand_stats?.mean?.toFixed(1) || 'N/A'}</div>
-                    <div><span className="text-blue-700">Exogenous Vars:</span> {
-                      datasetInfo.columns.filter(col => 
-                        ['price', 'ads', 'holidays', 'promotions', 'competitor_price', 'weather_index'].includes(col)
-                      ).length || 'None'
-                    }</div>
-                  </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <Button variant="outline" className="flex-1 border-sns-orange text-sns-orange hover:bg-sns-orange hover:text-white bg-transparent" onClick={togglePreview}>
-                    {showPreview ? 'Hide Dataset Preview' : 'Show Dataset Preview'}
-                  </Button>
-                  <Button disabled={!datasetInfo} className="bg-sns-orange hover:bg-sns-orange-dark text-white" onClick={() => datasetInfo && onProcessingComplete(datasetInfo)}>
-                    Continue
-                  </Button>
-                </div>
-
-                {showPreview && datasetPreview.length > 0 && (
-                  <div className="mt-2 p-4 bg-gray-50 rounded-lg border">
-                    <h4 className="font-semibold text-gray-900 mb-2">Dataset Preview (First 5 rows)</h4>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full bg-white text-sm">
-                        <thead>
-                          <tr className="bg-gray-100">
-                            {datasetPreview[0]?.row.map((header: string, index: number) => (
-                              <th key={index} className="px-4 py-2 text-left font-medium text-gray-700 border">
-                                {header}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {datasetPreview.slice(1).map((row, rowIndex) => (
-                            <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
-                              {row.row.map((cell: string, cellIndex: number) => (
-                                <td key={cellIndex} className="px-4 py-2 border">
-                                  {cell}
-                                </td>
-                              ))}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-              </div>
+            {uploading && (
+              <LoaderSpinner 
+                fullscreen
+                showStepper 
+                message="Processing your data..." 
+                steps={uploadSteps.map(s => s.label)}
+                step={uploadSteps.findIndex(s => s.status === "processing")}
+                size="md"
+                background="#fdfaf6"
+              />
             )}
           </CardContent>
         </Card>
 
-        <UploadProgress steps={uploadSteps} />
+        {/* Professional Error Modal */}
+        {showErrorModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 transform transition-all duration-300 scale-100">
+              <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                    <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">Processing Failed</h3>
+                    <p className="text-sm text-gray-600">An error occurred during data processing</p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleErrorModalClose}
+                  className="text-gray-400 hover:text-gray-600 transition-colors p-2 rounded-lg hover:bg-gray-100"
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="p-6">
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                  <div className="flex items-start gap-3">
+                    <svg className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div>
+                      <h4 className="font-semibold text-red-800 mb-1">Error Details</h4>
+                      <p className="text-red-700 text-sm">
+                        {error || 'An unexpected error occurred during file processing. Please check your file format and try again.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                  <h4 className="font-semibold text-blue-800 mb-2">Troubleshooting Tips</h4>
+                  <ul className="text-blue-700 text-sm space-y-1">
+                    <li>• Ensure your CSV has &apos;date&apos; and &apos;demand&apos; columns</li>
+                    <li>• Check that date format is consistent (YYYY-MM-DD)</li>
+                    <li>• Verify demand values are numeric</li>
+                    <li>• Include sufficient historical data (30+ records)</li>
+                  </ul>
+                </div>
+
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={handleErrorModalClose}
+                    className="flex-1 border-gray-300 text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleErrorModalClose}
+                    className="flex-1 bg-sns-orange hover:bg-sns-orange-dark text-white"
+                  >
+                    Try Again
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </>
   )
