@@ -9,6 +9,7 @@ import { FileText, Download, CheckCircle } from 'lucide-react'
 import { FileUploadZone } from '@/components/file-upload-zone'
 import { DataTable } from '@/components/data-table'
 import LoaderSpinner from '@/components/ui/loader'
+import { X } from 'lucide-react'
 
 interface UploadProps {
   onProcessingComplete: (datasetInfo: DatasetInfo) => void
@@ -24,13 +25,15 @@ interface UploadStep {
 export default function Upload({ onProcessingComplete }: UploadProps) {
   const [uploading, setUploading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
-  const [datasetInfo, setDatasetInfo] = useState<DatasetInfo | null>(null)
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [isDownloaded, setIsDownloaded] = useState(false)
+  const [showErrorModal, setShowErrorModal] = useState<boolean>(false)
   const [uploadSteps, setUploadSteps] = useState<UploadStep[]>([
     { id: 'upload', label: 'File Upload', status: 'pending' },
     { id: 'validate', label: 'Data Validation', status: 'pending' },
     { id: 'parse', label: 'Column Analysis', status: 'pending' },
+    { id: 'train', label: 'Training ARIMA Model', status: 'pending' },
+    { id: 'predict', label: 'Generating Forecast', status: 'pending' },
     { id: 'ready', label: 'Ready for Results', status: 'pending' },
   ])
 
@@ -77,7 +80,7 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
     setTimeout(() => setIsDownloaded(false), 1500)
   }
 
-  type UploadMeta = { columnsCount: number; rowsCount: number; hasRequired: boolean }
+  type UploadMeta = { columnsCount: number; rowsCount: number; hasRequired: boolean; datasetInfo: DatasetInfo }
 
   const uploadFileToBackend = async (file: File): Promise<UploadMeta> => {
     const formData = new FormData()
@@ -89,7 +92,6 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
     setError(null)
     try {
       const response = await axios.post<UploadResponse>('http://localhost:8000/api/arima/upload-dataset/', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
-      setDatasetInfo(response.data.dataset_info)
 
       // Build metadata directly from the uploaded file to ensure accuracy
       const text = await file.text()
@@ -99,16 +101,20 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
       const hasRequired = headers.includes('date') && headers.includes('demand')
       const rowsCount = Math.max(allLines.length - 1, 0)
 
-      return { columnsCount: headers.length, rowsCount, hasRequired }
+      return { 
+        columnsCount: headers.length, 
+        rowsCount, 
+        hasRequired,
+        datasetInfo: response.data.dataset_info
+      }
     } catch (err) {
       if (axios.isAxiosError(err) && err.response) {
         setError((err.response.data as ApiError).error || 'Upload failed')
       } else {
         setError('Upload failed')
       }
-      throw err
-    } finally {
       setUploading(false)
+      throw err
     }
   }
 
@@ -130,32 +136,57 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
       await new Promise((r) => setTimeout(r, 500))
       setUploadSteps((s) => s.map((st) => (st.id === 'parse' ? { ...st, status: 'completed', message: `${meta.columnsCount} columns detected` } : st)))
 
+      setUploadSteps((s) => s.map((st) => (st.id === 'train' ? { ...st, status: 'processing', message: 'Training ARIMA model...' } : st)))
+      try {
+        await axios.post('http://localhost:8000/api/arima/train/')
+        setUploadSteps((s) => s.map((st) => (st.id === 'train' ? { ...st, status: 'completed', message: 'Model trained' } : st)))
+      } catch {
+        setUploadSteps((s) => s.map((st) => (st.id === 'train' ? { ...st, status: 'error', message: 'Training failed' } : st)))
+        throw new Error('Model training failed')
+      }
+
+      setUploadSteps((s) => s.map((st) => (st.id === 'predict' ? { ...st, status: 'processing', message: 'Generating 30-day forecast...' } : st)))
+      try {
+        await axios.post('http://localhost:8000/api/arima/predict/', { periods: 30 })
+        setUploadSteps((s) => s.map((st) => (st.id === 'predict' ? { ...st, status: 'completed', message: 'Forecast generated' } : st)))
+      } catch {
+        setUploadSteps((s) => s.map((st) => (st.id === 'predict' ? { ...st, status: 'error', message: 'Prediction failed' } : st)))
+        throw new Error('Prediction failed')
+      }
+
       setUploadSteps((s) => s.map((st) => (st.id === 'ready' ? { ...st, status: 'processing', message: 'Preparing results...' } : st)))
       await new Promise((r) => setTimeout(r, 600))
       setUploadSteps((s) => s.map((st) => (st.id === 'ready' ? { ...st, status: 'completed', message: 'Ready' } : st)))
       
-      // Complete processing and call the callback
+      // Complete processing and call the callback with the datasetInfo from uploadFileToBackend
       setUploading(false)
-      if (datasetInfo) {
-        onProcessingComplete(datasetInfo)
-      }
+      onProcessingComplete(meta.datasetInfo)
     } catch {
       setUploadSteps((s) => s.map((st) => (st.id === 'upload' ? { ...st, status: 'error', message: 'Upload failed' } : st)))
       setUploading(false)
+      setError('Upload failed. Please try again.')
+      setShowErrorModal(true)
     }
   }
 
   const handleFileUpload = async (file: File) => { 
     setUploadedFile(file)
     setError(null)
+    setUploadSteps((prev) => prev.map((s) => ({ ...s, status: 'pending' as const, message: undefined })))
     startProcessing(file) 
   }
 
   const handleFileRemove = () => { 
     setUploadedFile(null)
-    setDatasetInfo(null)
     setError(null)
     setUploadSteps((prev) => prev.map((s) => ({ ...s, status: 'pending' as const, message: undefined }))) 
+  }
+
+  const handleErrorModalClose = () => {
+    setShowErrorModal(false)
+    setError(null)
+    setUploadedFile(null)
+    setUploadSteps((prev) => prev.map((s) => ({ ...s, status: 'pending' as const, message: undefined })))
   }
 
   return (
@@ -244,6 +275,36 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
           </CardContent>
         </Card>
       </div>
+
+      {/* Error Modal */}
+      {showErrorModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="flex items-center justify-between p-6 border-b">
+              <h3 className="text-lg font-semibold text-red-600">Upload Failed</h3>
+              <button
+                onClick={handleErrorModalClose}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-6">
+              <p className="text-gray-600 mb-4">
+                {error || 'An error occurred during file upload. Please check your file format and try again.'}
+              </p>
+              <div className="flex justify-end">
+                <Button 
+                  onClick={handleErrorModalClose} 
+                  className="bg-sns-orange hover:bg-sns-orange-dark text-white"
+                >
+                  Try Again
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

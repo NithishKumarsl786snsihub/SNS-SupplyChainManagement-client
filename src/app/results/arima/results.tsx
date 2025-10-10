@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import axios from 'axios'
-import type { ApiError, DatasetInfo, ModelInfo, PredictionResponse } from '@/types/api'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { motion } from "framer-motion"
+import { Download, TrendingUp, TrendingDown, BarChart3, Activity } from "lucide-react"
+import type { ApiError, DatasetInfo, PredictionResponse } from '@/types/api'
 import { Button } from '@/components/ui/button'
-import LoaderSpinner from '@/components/ui/loader'
 import { ResponsiveContainer, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line } from 'recharts'
 import { BreadcrumbNav } from '@/components/breadcrumb-nav'
+import ExportModal from '@/components/ui/export-modal'
 
 interface ResultsProps {
   datasetInfo: DatasetInfo | null
@@ -24,13 +25,9 @@ interface ChartData {
 }
 
 export default function Results({ datasetInfo, onRunAnotherModel }: ResultsProps) {
-  const [training, setTraining] = useState<boolean>(false)
-  const [predicting, setPredicting] = useState<boolean>(false)
-  const [modelInfo, setModelInfo] = useState<ModelInfo | null>(null)
   const [predictions, setPredictions] = useState<PredictionResponse | null>(null)
   const [error, setError] = useState<string>('')
-  const [autoRan, setAutoRan] = useState<boolean>(false)
-  const [showDemandTable, setShowDemandTable] = useState<boolean>(true)
+  const [showExport, setShowExport] = useState(false)
 
   const breadcrumbItems = [
     { label: 'Home', href: '/' },
@@ -38,26 +35,8 @@ export default function Results({ datasetInfo, onRunAnotherModel }: ResultsProps
     { label: 'ARIMA', current: true },
   ]
 
-  const trainModel = async (): Promise<void> => {
-    setTraining(true)
-    setError('')
-
-    try {
-      const response = await axios.post<{ model_info: ModelInfo }>('http://localhost:8000/api/arima/train/')
-      setModelInfo(response.data.model_info)
-    } catch (err) {
-      if (axios.isAxiosError(err) && err.response) {
-        setError((err.response.data as ApiError).error || 'Training failed')
-      } else {
-        setError('Training failed')
-      }
-    } finally {
-      setTraining(false)
-    }
-  }
 
   const getPredictions = async (periods: number = 30): Promise<void> => {
-    setPredicting(true)
     setError('')
 
     try {
@@ -69,26 +48,20 @@ export default function Results({ datasetInfo, onRunAnotherModel }: ResultsProps
       } else {
         setError('Prediction failed')
       }
-    } finally {
-      setPredicting(false)
     }
   }
 
-  // Auto-run training and prediction once the results page loads after upload
+  // Load predictions when results page loads (training and prediction already done in upload)
   useEffect(() => {
-    const run = async () => {
-      if (autoRan) return
+    const loadPredictions = async () => {
       if (!datasetInfo) return
-      setAutoRan(true)
       try {
-        await trainModel()
         await getPredictions(30)
       } catch {
         // errors are handled inside functions
       }
     }
-    run()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    loadPredictions()
   }, [datasetInfo])
 
   const chartData: ChartData[] = predictions
@@ -131,79 +104,51 @@ export default function Results({ datasetInfo, onRunAnotherModel }: ResultsProps
     return netChange > 0 ? 'Rising' : 'Declining'
   })()
 
-  const isPageLoading = training || predicting || (autoRan && !predictions)
-
   return (
     <div className="min-h-screen bg-sns-cream/20">
-      {isPageLoading && <LoaderSpinner fullscreen size="md" message={training ? 'Training ARIMA model...' : 'Generating 30-day forecast...'} />}
+      {/* Full page layout without sidebar */}
       <div className="px-4 sm:px-6 lg:px-8 py-8">
         <BreadcrumbNav items={breadcrumbItems} />
 
-        <div className="mb-6 flex items-center justify-between">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+          <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">ARIMA Results</h1>
-            <p className="text-gray-600">Time series forecasting without external variables</p>
+              <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">ARIMA Results</h1>
+              <p className="text-lg text-gray-600 max-w-3xl">Time series forecasting with autoregressive integrated moving average for precise demand prediction.</p>
           </div>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                className="border-sns-orange text-sns-orange hover:bg-sns-orange hover:text-white bg-transparent"
+                onClick={() => setShowExport(true)}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export Results
+              </Button>
           <Button className="bg-sns-orange hover:bg-sns-orange-dark text-white" onClick={onRunAnotherModel}>
             Run Another Model
           </Button>
         </div>
-
-        <div className="grid grid-cols-1 xl:grid-cols-1 gap-6 ">
-          {/* Left Column: Dataset Info */}
-          <div className="xl:col-span-2 space-y-6">
-            {false && datasetInfo && (
-              <Card className="rounded-2xl border-0 bg-white/70 backdrop-blur ring-1 ring-[#F3E9DC] shadow-[0_10px_30px_rgba(217,111,50,0.06)]">
-                <CardHeader>
-                  <CardTitle>Dataset Information</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div><span className="text-blue-700">Rows:</span> {datasetInfo?.rows}</div>
-                    <div><span className="text-blue-700">Columns:</span> {datasetInfo?.columns?.length}</div>
-                    <div><span className="text-blue-700">Avg Demand:</span> {datasetInfo?.demand_stats?.mean?.toFixed(1) || 'N/A'}</div>
-                    <div><span className="text-blue-700">Std Demand:</span> {datasetInfo?.demand_stats?.std?.toFixed(1) || 'N/A'}</div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
           </div>
+        </motion.div>
 
-          {/* Right Column: Forecast */}
-          <div className="xl:col-span-2 space-y-6">
-            {false && (
-              <Card className="bg-white rounded-2xl border-0 ring-1 ring-[#F3E9DC] shadow-[0_10px_30px_rgba(217,111,50,0.06)]">
-                <CardHeader>
-                  <CardTitle className="text-md">Model Information</CardTitle>
-                </CardHeader>
-                <CardContent>   
-                  {modelInfo && (
-                    <div className="mb-4 p-4 bg-gray-50 rounded-lg border">
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div><span className="text-gray-600">Order (p,d,q):</span> ({modelInfo?.order?.join(', ')})</div>
-                        <div><span className="text-gray-600">AIC Score:</span> {modelInfo?.aic?.toFixed(2) || 'N/A'}</div>
-                        {modelInfo?.bic && (
-                          <div><span className="text-gray-600">BIC Score:</span> {modelInfo?.bic?.toFixed(2) || 'N/A'}</div>
-                        )}
+            {/* Chart and Metrics Layout - 70% Chart, 30% Metrics */}
+            <div className="mb-8 grid grid-cols-1 lg:grid-cols-10 gap-6">
+              {/* Chart Section - 70% width */}
+              <div className="lg:col-span-7">
+                <div className="bg-white rounded-xl border border-gray-200 shadow-lg p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-gradient-to-br from-sns-orange to-orange-600 rounded-lg shadow-md">
+                      <Activity className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900">ARIMA Forecast</h3>
+                      <p className="text-gray-600 text-sm">30-day demand forecast with confidence intervals</p>
                       </div>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-            <Card className="bg-white rounded-2xl border-0 ring-1 ring-[#F3E9DC] shadow-[0_10px_30px_rgba(217,111,50,0.06)]">
-              <CardHeader>
-                <CardTitle className="text-xl flex items-center">  
-                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                        </svg>
-                        ARIMA Forecast Results</CardTitle>
-              </CardHeader>
-              <CardContent>
-           
 
                 {error && (
-                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <div className="p-4 bg-red-50 border border-red-200 rounded-lg mb-4">
                     <div className="flex items-center">
                       <svg className="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -216,12 +161,11 @@ export default function Results({ datasetInfo, onRunAnotherModel }: ResultsProps
                 {predictions && (
                   <div className="mt-6">
                     <div className="flex items-center justify-between mb-4">
-                   
                       <span className="bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full">
                         {predictions.dates.length} periods forecast
                       </span>
                     </div>
-                    <ResponsiveContainer width="100%" height={600}>
+                      <ResponsiveContainer width="100%" height={500}>
                       <LineChart data={chartDataSorted}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                         <XAxis 
@@ -302,7 +246,7 @@ export default function Results({ datasetInfo, onRunAnotherModel }: ResultsProps
                             padding: '12px'
                           }}
                           labelStyle={{ color: '#374151', fontWeight: '700', fontSize: '16px' }}
-                          formatter={(value: any, name: string) => {
+                            formatter={(value: number, name: string) => {
                             const label = name === 'prediction' ? 'Predicted' : name
                             return [
                               typeof value === 'number' ? `${value.toFixed(0)} units` : value,
@@ -332,151 +276,276 @@ export default function Results({ datasetInfo, onRunAnotherModel }: ResultsProps
                         )}
                       </LineChart>
                     </ResponsiveContainer>
-
-                    {/* Insights Section */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-6">
-                      <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200">
-                        <div className="text-sm text-blue-700">Total Predicted Demand</div>
-                        <div className="text-2xl font-bold text-blue-900 mt-1">{totalPredicted.toFixed(0)}</div>
                       </div>
-                      <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200">
-                        <div className="text-sm text-green-700">Average Daily Demand</div>
-                        <div className="text-2xl font-bold text-green-900 mt-1">{averageDaily.toFixed(1)}</div>
-                      </div>
-                      <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 border border-purple-200">
-                        <div className="text-sm text-purple-700">Peak Demand</div>
-                        <div className="text-2xl font-bold text-purple-900 mt-1">{peakPoint?.prediction?.toFixed(0) || '—'}</div>
-                        <div className="text-xs text-purple-700 mt-1">{peakPoint ? new Date(peakPoint.date).toLocaleDateString() : ''}</div>
-                      </div>
-                      <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl p-6 border border-amber-200">
-                        <div className="text-sm text-amber-700">Overall Trend</div>
-                        <div className="text-2xl font-bold text-amber-900 mt-1">{trendLabel}</div>
-                        <div className="text-xs text-amber-700 mt-1">Net Δ {netChange.toFixed(1)} units</div>
+                  )}
                       </div>
                     </div>
 
-                    {/* Table Toggle */}
-                    <div className="mt-6 flex items-center justify-between">
-                      <div className="text-sm text-gray-600">Forecast breakdown</div>
-                      <Button variant="outline" onClick={() => setShowDemandTable((s) => !s)}>
-                        {showDemandTable ? 'Hide Table' : 'Show Table'}
-                      </Button>
+              {/* Metrics Section - 30% width */}
+              <div className="lg:col-span-3">
+                {predictions && (
+                  <div className="space-y-4">
+                    {/* Total Predicted Demand Card */}
+                    <motion.div 
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200 shadow-md flex flex-col justify-center"
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="p-1.5 bg-blue-500 rounded-md">
+                          <Activity className="h-4 w-4 text-white" />
+                        </div>
+                        <h3 className="text-blue-700 font-semibold text-sm">Total Predicted</h3>
+                      </div>
+                      <div className="text-xl font-bold text-blue-900 mb-1">
+                        {totalPredicted.toFixed(0)}
+                      </div>
+                      <p className="text-blue-600 text-xs">30-day forecast total</p>
+                    </motion.div>
+
+                    {/* Average Daily Demand Card */}
+                    <motion.div 
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1 }}
+                      className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 border border-green-200 shadow-md flex flex-col justify-center"
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className="p-1.5 bg-green-500 rounded-md">
+                          <BarChart3 className="h-4 w-4 text-white" />
+                        </div>
+                        <h3 className="text-green-700 font-semibold text-sm">Daily Average</h3>
+                      </div>
+                      <div className="text-xl font-bold text-green-900 mb-1">
+                        {averageDaily.toFixed(1)}
+                      </div>
+                      <p className="text-green-600 text-xs">Units per day</p>
+                    </motion.div>
+
+                    {/* Peak Demand Card */}
+                    <motion.div 
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.2 }}
+                      className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 border border-purple-200 shadow-md flex flex-col justify-center"
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="p-1.5 bg-purple-500 rounded-md">
+                          <TrendingUp className="h-4 w-4 text-white" />
+                        </div>
+                        <h3 className="text-purple-700 font-semibold text-sm">Peak Demand</h3>
+                      </div>
+                      <div className="text-xl font-bold text-purple-900 mb-1">
+                        {peakPoint?.prediction?.toFixed(0) || '—'}
+                      </div>
+                      <p className="text-purple-600 text-xs">
+                        {peakPoint ? new Date(peakPoint.date).toLocaleDateString() : 'No data'}
+                      </p>
+                    </motion.div>
+
+                    {/* Trend Card */}
+                    <motion.div 
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 }}
+                      className={`rounded-lg p-4 border shadow-md flex flex-col justify-center ${
+                        trendLabel === 'Rising' 
+                          ? 'bg-gradient-to-br from-green-50 to-green-100 border-green-200'
+                          : trendLabel === 'Declining'
+                          ? 'bg-gradient-to-br from-red-50 to-red-100 border-red-200'
+                          : 'bg-gradient-to-br from-gray-50 to-gray-100 border-gray-200'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className={`p-1.5 rounded-md ${
+                          trendLabel === 'Rising' 
+                            ? 'bg-green-500'
+                            : trendLabel === 'Declining'
+                            ? 'bg-red-500'
+                            : 'bg-gray-500'
+                        }`}>
+                          {trendLabel === 'Rising' ? (
+                            <TrendingUp className="h-4 w-4 text-white" />
+                          ) : trendLabel === 'Declining' ? (
+                            <TrendingDown className="h-4 w-4 text-white" />
+                          ) : (
+                            <BarChart3 className="h-4 w-4 text-white" />
+                          )}
+                        </div>
+                        <h3 className={`font-semibold text-sm ${
+                          trendLabel === 'Rising' 
+                            ? 'text-green-700'
+                            : trendLabel === 'Declining'
+                            ? 'text-red-700'
+                            : 'text-gray-700'
+                        }`}>Trend</h3>
+                      </div>
+                      <div className={`text-xl font-bold mb-1 ${
+                        trendLabel === 'Rising' 
+                          ? 'text-green-900'
+                          : trendLabel === 'Declining'
+                          ? 'text-red-900'
+                          : 'text-gray-900'
+                      }`}>
+                        {trendLabel}
+                      </div>
+                      <p className={`text-xs ${
+                        trendLabel === 'Rising' 
+                          ? 'text-green-600'
+                          : trendLabel === 'Declining'
+                          ? 'text-red-600'
+                          : 'text-gray-600'
+                      }`}>
+                        Net Δ {netChange.toFixed(1)} units
+                      </p>
+                    </motion.div>
+                  </div>
+                )}
+              </div>
                     </div>
 
                     {/* Forecast Data Table */}
-                    {showDemandTable && (
-                    <Card className="mt-3 shadow-lg border-0 bg-white/80">
-                      <CardHeader>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <CardTitle className="text-xl font-bold text-gray-800">Forecast Data Table</CardTitle>
-                            <p className="text-sm text-gray-600 mt-1">Complete forecast breakdown with sorting and filtering</p>
+            <div className="mb-8">
+              <div className="rounded-xl bg-white shadow-lg">
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div>
+                        <h3 className="text-xl font-bold text-gray-900">Forecast Data Analysis</h3>
+                        <p className="text-gray-600 text-sm">Complete forecast breakdown with trend analysis</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <div className="text-sm text-gray-500">{chartDataSorted.length} records</div>
+                    </div>
+                  </div>
+
+                  {/* Forecast Data Table */}
+                    <div className="mt-6 bg-white rounded-xl border border-gray-200 shadow-lg overflow-hidden">
+                      <div className="bg-gradient-to-r from-sns-orange via-orange-500 to-orange-600 px-4 py-3">
+                        <div className="grid grid-cols-4 gap-3 text-white font-semibold text-xs">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 bg-white rounded-full"></div>
+                            Category
                           </div>
-                          <div className="flex items-center space-x-2">
-                            <div className="text-sm text-gray-500">{chartDataSorted.length} records</div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                if (!chartDataSorted || chartDataSorted.length === 0) return
-                                const csvData = chartDataSorted.map((row, index) => {
-                                  const prev = chartDataSorted[index - 1]?.prediction
-                                  const diff = typeof prev === 'number' ? row.prediction - prev : 0
-                                  const rounded = Math.round(diff * 10) / 10
-                                  const trend = index === 0 ? '0.0' : (rounded === 0 ? '0.0' : (rounded > 0 ? `+${rounded.toFixed(1)}` : `${rounded.toFixed(1)}`))
-                                  return {
-                                    Category: 'ARIMA',
-                                    Date: new Date(row.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
-                                    Prediction: row.prediction.toFixed(1),
-                                    Trend: trend
-                                  }
-                                })
-                                const csvContent = [
-                                  Object.keys(csvData[0]).join(','),
-                                  ...csvData.map((r: any) => Object.values(r).join(','))
-                                ].join('\n')
-                                const blob = new Blob([csvContent], { type: 'text/csv' })
-                                const url = window.URL.createObjectURL(blob)
-                                const a = document.createElement('a')
-                                a.href = url
-                                a.download = `arima_forecast_${predictions?.dates?.length || chartDataSorted.length}days.csv`
-                                a.click()
-                                window.URL.revokeObjectURL(url)
-                              }}
-                              className="text-blue-600 hover:text-blue-700"
-                            >
-                              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                              </svg>
-                              Export CSV
-                            </Button>
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 bg-white rounded-full"></div>
+                            Date
+                          </div>
+                          <div className="text-right flex items-center justify-end gap-2">
+                            <div className="w-2 h-2 bg-white rounded-full"></div>
+                            Forecast
+                          </div>
+                          <div className="text-right flex items-center justify-end gap-2">
+                            <div className="w-2 h-2 bg-white rounded-full"></div>
+                            Trend
                           </div>
                         </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="overflow-x-auto">
-                          <table className="w-full">
-                            <thead>
-                              <tr className="border-b border-gray-200">
-                                <th className="text-left py-3 px-4 font-semibold text-gray-700">Category</th>
-                                <th className="text-left py-3 px-4 font-semibold text-gray-700">Date</th>
-                                <th className="text-left py-3 px-4 font-semibold text-gray-700">Forecast</th>
-                                <th className="text-left py-3 px-4 font-semibold text-gray-700">Trend</th>
-                              </tr>
-                            </thead>
-                            <tbody>
+                      </div>
+                      
+                      <div className="max-h-96 overflow-y-auto">
+                        <div className="divide-y divide-gray-100">
                               {chartDataSorted.map((row, index) => {
                                 const prev = chartDataSorted[index - 1]?.prediction
                                 const difference = typeof prev === 'number' ? row.prediction - prev : 0
                                 const roundedDifference = Math.round(difference * 10) / 10
                                 return (
-                                  <tr key={row.date} className="border-b border-gray-100 hover:bg-gray-50/50">
-                                    <td className="py-3 px-4">
+                              <div key={row.date} 
+                                   className="grid grid-cols-4 gap-3 px-4 py-3 hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-indigo-50/30 transition-all duration-200">
+                                {/* Category */}
                                       <div className="flex items-center">
                                         <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
                                           <span className="text-sm font-semibold text-blue-600">A</span>
                                         </div>
                                         <span className="font-medium text-gray-800">ARIMA</span>
                                       </div>
-                                    </td>
-                                    <td className="py-3 px-4">
-                                      <span className="font-medium text-gray-800">
-                                        {new Date(row.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
-                                      </span>
-                                    </td>
-                                    <td className="py-3 px-4">
+                                
+                                {/* Date */}
                                       <div className="flex items-center">
-                                        <span className="font-semibold text-blue-600">{row.prediction.toFixed(1)}</span>
-                                        <span className="text-sm text-gray-500 ml-1">units</span>
+                                  <div className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
+                                    {new Date(row.date).toLocaleDateString('en-US', { 
+                                      month: 'short', 
+                                      day: 'numeric' 
+                                    })}
+                                  </div>
+                                </div>
+                                
+                                {/* Forecast */}
+                                <div className="text-right">
+                                  <div className="text-sm font-bold text-gray-900">
+                                    {row.prediction.toFixed(1)}
+                                  </div>
+                                  <div className="text-xs text-gray-500">units</div>
                                       </div>
-                                    </td>
-                                    <td className="py-3 px-4">
+                                
+                                {/* Trend */}
+                                <div className="text-right">
                                       {index === 0 ? (
-                                        <span className="font-semibold text-gray-600">0.0</span>
-                                      ) : roundedDifference === 0 ? (
-                                        <span className="font-semibold text-gray-600">0.0</span>
-                                      ) : roundedDifference > 0 ? (
-                                        <span className="font-semibold text-green-600">+{roundedDifference.toFixed(1)}</span>
+                                    <div className="text-gray-400 text-sm">-</div>
+                                  ) : (
+                                    <div className="flex items-center justify-end gap-1">
+                                      {roundedDifference > 0 ? (
+                                        <TrendingUp className="h-4 w-4 text-green-500" />
+                                      ) : roundedDifference < 0 ? (
+                                        <TrendingDown className="h-4 w-4 text-red-500" />
                                       ) : (
-                                        <span className="font-semibold text-red-600">{roundedDifference.toFixed(1)}</span>
+                                        <div className="h-4 w-4 bg-gray-300 rounded-full"></div>
                                       )}
-                                    </td>
-                                  </tr>
-                                )
-                              })}
-                            </tbody>
-                          </table>
+                                      <span className={`text-sm font-semibold ${
+                                        roundedDifference > 0 ? 'text-green-600' : roundedDifference < 0 ? 'text-red-600' : 'text-gray-600'
+                                      }`}>
+                                        {roundedDifference > 0 ? '+' : ''}{roundedDifference.toFixed(1)}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })}
                         </div>
-                      </CardContent>
-                    </Card>
-                    )}
-                    
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+                      </div>
+                    </div>
+                </div>
+              </div>
+            </div>
+
+        {/* Export Modal */}
+        {showExport && (
+          <ExportModal
+            onClose={() => setShowExport(false)}
+            title="Export ARIMA Forecast"
+            subtitle="Download forecast data as CSV with trend analysis."
+            input={{
+              predictions: chartDataSorted.map((row, index) => {
+                const prev = chartDataSorted[index - 1]?.prediction
+                const diff = typeof prev === 'number' ? row.prediction - prev : 0
+                const rounded = Math.round(diff * 10) / 10
+                const trend = index === 0 ? '0.0' : (rounded === 0 ? '0.0' : (rounded > 0 ? `+${rounded.toFixed(1)}` : `${rounded.toFixed(1)}`))
+                return {
+                  Category: 'ARIMA',
+                  Date: new Date(row.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
+                  Prediction: row.prediction.toFixed(1),
+                  Trend: trend
+                }
+              })
+            }}
+            onExport={async ({ input, onStoreProgress, onProductProgress }) => {
+              // For ARIMA, we'll create a simple CSV export
+              const headers = Object.keys(input.predictions[0] || {})
+              const csvContent = [
+                headers.join(','),
+                ...input.predictions.map((row) => Object.values(row).join(','))
+              ].join('\n')
+              
+              // Simulate progress
+              onStoreProgress(1, 1)
+              onProductProgress(1)
+              
+              return new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+            }}
+            buildFilename={() => `arima_forecast_${chartDataSorted.length}days.csv`}
+          />
+        )}
       </div>
     </div>
   )
