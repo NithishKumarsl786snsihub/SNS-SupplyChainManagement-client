@@ -1,6 +1,6 @@
 // API Configuration for Linear Regression Backend
-const API_BASE_URL = 'http://localhost:8000/api/m5'
-const API_BASE_URL_M6 = 'http://localhost:8000/api/m6'
+const API_BASE_URL = 'http://localhost:8000/api/m4'  // M4 = Linear Regression
+const API_BASE_URL_M6 = 'http://localhost:8000/api/m5'  // M5 = Log-Log Regression
 
 export interface DatasetUploadResponse {
   dataset_id: number
@@ -255,7 +255,7 @@ export const predictFromFutureFile = async (
   }
 }
 
-// M6 (log-log) dataset upload
+// M5 (log-log) dataset upload
 export const uploadDatasetM6 = async (file: File): Promise<DatasetUploadResponse> => {
   const formData = new FormData()
   formData.append('file', file)
@@ -266,12 +266,12 @@ export const uploadDatasetM6 = async (file: File): Promise<DatasetUploadResponse
     })
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.error || `M6 upload failed: ${response.statusText}`)
+      throw new Error(errorData.error || `M5 upload failed: ${response.statusText}`)
     }
     return response.json()
   } catch (error) {
     if (error instanceof TypeError && error.message.includes('fetch')) {
-      throw new Error('Unable to connect to backend server (M6). Please ensure the Django server is running on port 8000.')
+      throw new Error('Unable to connect to backend server (M5). Please ensure the Django server is running on port 8000.')
     }
     throw error
   }

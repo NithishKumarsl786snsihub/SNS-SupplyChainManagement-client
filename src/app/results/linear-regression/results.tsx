@@ -270,6 +270,8 @@ export default function Results({ onRunAnotherModel, trainingResult, predictionR
                   tick={{ fill: '#374151' }} 
                   tickFormatter={(value: number) => Number(value).toFixed(0)}
                   label={{ value: 'Demand', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fill: '#374151' } }}
+                  domain={['dataMin - 10', 'dataMax + 10']}
+                  tickCount={8}
                 />
                 <Tooltip 
                   contentStyle={{ backgroundColor: 'white', color: '#374151', border: '1px solid #e5e7eb' }}
@@ -278,8 +280,8 @@ export default function Results({ onRunAnotherModel, trainingResult, predictionR
                     name
                   ]}
                 />
-                <Line type="monotone" dataKey="actual" stroke="#2563EB" strokeWidth={2} name="Actual Demand" connectNulls />
-                <Line type="monotone" dataKey="predicted" stroke="#10B981" strokeWidth={2} name="Predicted Demand" />
+                <Line type="linear" dataKey="actual" stroke="#2563EB" strokeWidth={2} name="Actual Demand" connectNulls strokeLinecap="square" strokeLinejoin="miter" />
+                <Line type="linear" dataKey="predicted" stroke="#10B981" strokeWidth={2} name="Predicted Demand" strokeLinecap="square" strokeLinejoin="miter" />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -341,7 +343,7 @@ export default function Results({ onRunAnotherModel, trainingResult, predictionR
                   <button
                     type="button"
                     onClick={handleUseFutureSample}
-                    className="px-3 py-2 text-sm rounded-md bg-green-600 text-white hover:bg-green-700"
+                    className="px-3 py-2 text-sm rounded-md border border-[#D96F32] border-[1px] text-[#D96F32] hover:bg-[#D96F32] hover:text-white bg-transparent"
                     disabled={isPredicting || !datasetId}
                     title="Use sample future-features and run prediction"
                   >
@@ -389,6 +391,9 @@ export default function Results({ onRunAnotherModel, trainingResult, predictionR
                       tick={{ fill: '#374151' }} 
                       tickFormatter={(value: number) => Number(value).toFixed(0)}
                       label={{ value: 'Predicted Demand', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fill: '#374151' } }}
+                      domain={['dataMin - 10', 'dataMax + 10']}
+                      tickCount={20}
+                      allowDecimals={true}
                     />
                     <Tooltip 
                       contentStyle={{ backgroundColor: 'white', color: '#374151', border: '1px solid #e5e7eb' }}
@@ -400,30 +405,36 @@ export default function Results({ onRunAnotherModel, trainingResult, predictionR
                       ]}
                     />
                     <Line 
-                      type="monotone" 
+                      type="linear" 
                       dataKey="upper" 
                       stroke="#D96F32" 
                       strokeWidth={2}
                       strokeDasharray="5 5"
                       name="Upper Confidence Bound"
                       dot={{ fill: '#D96F32', strokeWidth: 1, r: 3 }}
+                      strokeLinecap="square"
+                      strokeLinejoin="miter"
                     />
                     <Line 
-                      type="monotone" 
+                      type="linear" 
                       dataKey="lower" 
                       stroke="#D96F32" 
                       strokeWidth={2}
                       strokeDasharray="5 5"
                       name="Lower Confidence Bound"
                       dot={{ fill: '#D96F32', strokeWidth: 1, r: 3 }}
+                      strokeLinecap="square"
+                      strokeLinejoin="miter"
                     />
                     <Line 
-                      type="monotone" 
+                      type="linear" 
                       dataKey="predicted" 
                       stroke="#D96F32" 
                       strokeWidth={3}
                       name="Predicted Demand"
                       dot={{ fill: '#D96F32', strokeWidth: 2, r: 4 }}
+                      strokeLinecap="square"
+                      strokeLinejoin="miter"
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -646,6 +657,8 @@ export default function Results({ onRunAnotherModel, trainingResult, predictionR
                           tick={{ fill: '#374151' }} 
                           tickFormatter={(v: number) => `$${v.toFixed(2)}`} 
                           label={{ value: 'Price ($)', angle: -90, position: 'insideLeft', offset: -15, style: { textAnchor: 'middle', fill: '#374151' } }} 
+                          domain={['dataMin - 0.5', 'dataMax + 0.5']}
+                          tickCount={8}
                         />
                         <Tooltip 
                           contentStyle={{ backgroundColor: 'white', color: '#374151', border: '1px solid #e5e7eb' }}
@@ -664,38 +677,46 @@ export default function Results({ onRunAnotherModel, trainingResult, predictionR
                         />
                         {/* Price Lines */}
                         <Line 
-                          type="monotone" 
+                          type="linear" 
                           dataKey="current_price" 
                           stroke="#3B82F6" 
                           strokeWidth={3}
                           name="Current Price"
                           dot={{ fill: '#3B82F6', strokeWidth: 2, r: 4 }}
+                          strokeLinecap="square"
+                          strokeLinejoin="miter"
                         />
                         <Line 
-                          type="monotone" 
+                          type="linear" 
                           dataKey="optimal_price" 
                           stroke="#10B981" 
                           strokeWidth={3}
                           name="Optimal Price"
                           dot={{ fill: '#10B981', strokeWidth: 2, r: 4 }}
+                          strokeLinecap="square"
+                          strokeLinejoin="miter"
                         />
                         <Line 
-                          type="monotone" 
+                          type="linear" 
                           dataKey="upper_bound_price" 
                           stroke="#F59E0B" 
                           strokeWidth={2}
                           strokeDasharray="5 5"
                           name="Upper Bound"
                           dot={{ fill: '#F59E0B', strokeWidth: 1, r: 3 }}
+                          strokeLinecap="square"
+                          strokeLinejoin="miter"
                         />
                         <Line 
-                          type="monotone" 
+                          type="linear" 
                           dataKey="lower_bound_price" 
                           stroke="#EF4444" 
                           strokeWidth={2}
                           strokeDasharray="5 5"
                           name="Lower Bound"
                           dot={{ fill: '#EF4444', strokeWidth: 1, r: 3 }}
+                          strokeLinecap="square"
+                          strokeLinejoin="miter"
                         />
                       </ComposedChart>
                     </ResponsiveContainer>
@@ -886,6 +907,8 @@ export default function Results({ onRunAnotherModel, trainingResult, predictionR
                           tick={{ fill: '#374151' }} 
                           tickFormatter={(v: number) => `$${v.toFixed(2)}`} 
                           label={{ value: 'Price ($)', angle: -90, position: 'insideLeft', offset: -10, style: { textAnchor: 'middle', fill: '#374151' } }} 
+                          domain={['dataMin - 0.5', 'dataMax + 0.5']}
+                          tickCount={8}
                         />
                         <Tooltip 
                           contentStyle={{ backgroundColor: 'white', color: '#374151', border: '1px solid #e5e7eb' }}
@@ -904,38 +927,46 @@ export default function Results({ onRunAnotherModel, trainingResult, predictionR
                         />
                         {/* Price Lines */}
                         <Line 
-                          type="monotone" 
+                          type="linear" 
                           dataKey="current_price" 
                           stroke="#3B82F6" 
                           strokeWidth={3}
                           name="Current Price"
                           dot={{ fill: '#3B82F6', strokeWidth: 2, r: 4 }}
+                          strokeLinecap="square"
+                          strokeLinejoin="miter"
                         />
                         <Line 
-                          type="monotone" 
+                          type="linear" 
                           dataKey="optimal_price" 
                           stroke="#10B981" 
                           strokeWidth={3}
                           name="Optimal Price"
                           dot={{ fill: '#10B981', strokeWidth: 2, r: 4 }}
+                          strokeLinecap="square"
+                          strokeLinejoin="miter"
                         />
                         <Line 
-                          type="monotone" 
+                          type="linear" 
                           dataKey="upper_bound_price" 
                           stroke="#F59E0B" 
                           strokeWidth={2}
                           strokeDasharray="5 5"
                           name="Upper Bound"
                           dot={{ fill: '#F59E0B', strokeWidth: 1, r: 3 }}
+                          strokeLinecap="square"
+                          strokeLinejoin="miter"
                         />
                         <Line 
-                          type="monotone" 
+                          type="linear" 
                           dataKey="lower_bound_price" 
                           stroke="#EF4444" 
                           strokeWidth={2}
                           strokeDasharray="5 5"
                           name="Lower Bound"
                           dot={{ fill: '#EF4444', strokeWidth: 1, r: 3 }}
+                          strokeLinecap="square"
+                          strokeLinejoin="miter"
                         />
                       </ComposedChart>
                     </ResponsiveContainer>

@@ -495,7 +495,7 @@ export default function Upload({ onProcessingComplete }: UploadProps) {
                 </>
               )}
             </Button>
-              <Button onClick={handleUseSampleForPrediction} className="bg-green-600 hover:bg-green-700 text-white" disabled={isUploading}>
+              <Button onClick={handleUseSampleForPrediction} className="border border-[#D96F32] border-[1px] text-[#D96F32] hover:bg-[#D96F32] hover:text-white bg-transparent" disabled={isUploading}>
                 Use Sample for Prediction
               </Button>
             </div>
